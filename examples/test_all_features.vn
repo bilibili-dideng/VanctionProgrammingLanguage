@@ -1,0 +1,49 @@
+func main() {
+    | 测试浮点数和双精度浮点数
+    float f = 3.14f;
+    double d = 2.71828;
+    System.print(f);
+    System.print(d);
+    
+    | 测试算术运算符
+    int a = 10;
+    int b = 5;
+    System.print(a + b);  | 15
+    System.print(a - b);  | 5
+    System.print(a * b);  | 50
+    System.print(a / b);  | 2
+    
+    | 测试浮点数算术运算
+    float f2 = f * 2.0f;
+    System.print(f2);     | 6.28
+    
+    | 测试位运算符
+    int c = 8;  | 1000 in binary
+    System.print(c << 1);  | 16 (10000)
+    System.print(c >> 1);  | 4  (0100)
+    
+    | 测试逻辑运算符
+    bool flag1 = true;
+    bool flag2 = false;
+    System.print(flag1 AND flag2);  | false
+    System.print(flag1 OR flag2);   | true
+    System.print(flag1 XOR flag2);  | true
+    
+    | 测试字符串操作
+    string s1 = "Hello";
+    string s2 = " World";
+    System.print(s1 + s2);  | Hello World
+    
+    | 测试类型转换
+    int i = 42;
+    float f3 = type.float(i);
+    double d2 = type.double(f3);
+    string s3 = type.string(i);
+    System.print(f3);  | 42.0f
+    System.print(d2);  | 42.0
+    System.print(s3);  | 42
+    
+    | 测试混合类型运算和转换
+    float f4 = type.float(a) + f;
+    System.print(f4);  | 13.14
+}

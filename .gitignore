@@ -1,0 +1,12 @@
+# IDE
+.idea
+.trae
+
+# build
+build/*
+
+# mingw64
+mingw64/*
+
+# exe
+*.exe

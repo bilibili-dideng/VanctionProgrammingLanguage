@@ -1,0 +1,60 @@
+#ifndef VANCTION_CODE_GENERATOR_H
+#define VANCTION_CODE_GENERATOR_H
+
+#include "../include/ast.h"
+#include <string>
+
+// 代码生成器类
+class CodeGenerator {
+public:
+    // Generate C++ code
+    std::string generate(Program* program);
+    
+private:
+    // Generate function declaration
+    std::string generateFunctionDeclaration(FunctionDeclaration* func);
+    
+    // Generate expression statement
+    std::string generateExpressionStatement(ExpressionStatement* stmt);
+    
+    // Generate expression
+    std::string generateExpression(Expression* expr);
+    
+    // Generate variable declaration
+    std::string generateVariableDeclaration(VariableDeclaration* varDecl);
+    
+    // Generate identifier
+    std::string generateIdentifier(Identifier* ident);
+    
+    // Generate integer literal
+    std::string generateIntegerLiteral(IntegerLiteral* literal);
+    
+    // Generate char literal
+    std::string generateCharLiteral(CharLiteral* literal);
+    
+    // Generate string literal
+    std::string generateStringLiteral(StringLiteral* literal);
+    
+    // Generate boolean literal
+    std::string generateBooleanLiteral(BooleanLiteral* literal);
+    
+    // Generate float literal
+    std::string generateFloatLiteral(FloatLiteral* literal);
+    
+    // Generate double literal
+    std::string generateDoubleLiteral(DoubleLiteral* literal);
+    
+    // Generate binary expression
+    std::string generateBinaryExpression(BinaryExpression* expr);
+    
+    // Generate assignment expression
+    std::string generateAssignmentExpression(AssignmentExpression* expr);
+    
+    // Generate function call
+    std::string generateFunctionCall(FunctionCall* call);
+    
+    // Generate comment
+    std::string generateComment(Comment* comment);
+};
+
+#endif // VANCTION_CODE_GENERATOR_H

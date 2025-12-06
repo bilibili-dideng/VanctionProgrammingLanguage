@@ -1,0 +1,5 @@
+func main() { | 这是主函数
+    | 使用System.print输出内容
+    System.print("我是内容");
+    System.print("Hello, Vanction!");
+} | 函数结束
