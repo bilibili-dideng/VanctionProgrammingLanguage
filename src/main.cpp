@@ -143,9 +143,31 @@ Value executeStatement(ASTNode* stmt, bool* shouldReturn = nullptr);
 Value executeExpression(Expression* expr);
 Value executeFunctionCall(FunctionCall* call);
 
+// Global namespace environment
+std::map<std::string, std::map<std::string, FunctionDeclaration*>> namespaces;
+
+// Execute namespace declaration
+void executeNamespaceDeclaration(NamespaceDeclaration* ns) {
+    // Create namespace if it doesn't exist
+    if (namespaces.find(ns->name) == namespaces.end()) {
+        namespaces[ns->name] = std::map<std::string, FunctionDeclaration*>();
+    }
+    
+    // Execute declarations inside namespace
+    for (auto decl : ns->declarations) {
+        if (auto func = dynamic_cast<FunctionDeclaration*>(decl)) {
+            // Store function in namespace
+            namespaces[ns->name][func->name] = func;
+        } else if (auto nestedNs = dynamic_cast<NamespaceDeclaration*>(decl)) {
+            // Execute nested namespace declaration
+            executeNamespaceDeclaration(nestedNs);
+        }
+    }
+}
+
 // Execute program
 Value executeProgram(Program* program) {
-    // Execute all function declarations
+    // Execute all declarations
     for (auto decl : program->declarations) {
         if (auto func = dynamic_cast<FunctionDeclaration*>(decl)) {
             Value result = executeFunctionDeclaration(func);
@@ -153,6 +175,9 @@ Value executeProgram(Program* program) {
             if (func->name == "main") {
                 return result;
             }
+        } else if (auto ns = dynamic_cast<NamespaceDeclaration*>(decl)) {
+            // Execute namespace declaration
+            executeNamespaceDeclaration(ns);
         }
     }
     return std::monostate{};
@@ -358,26 +383,27 @@ Value executeExpression(Expression* expr) {
 Value executeFunctionCall(FunctionCall* call) {
     if (call->objectName == "System" && call->methodName == "print") {
         // Handle System.print
-        for (auto arg : call->arguments) {
-            Value value = executeExpression(arg);
+        for (size_t i = 0; i < call->arguments.size(); ++i) {
+            Value value = executeExpression(call->arguments[i]);
             
             // Print based on value type
             if (std::holds_alternative<int>(value)) {
-                std::cout << std::get<int>(value) << std::endl;
+                std::cout << std::get<int>(value);
             } else if (std::holds_alternative<char>(value)) {
-                std::cout << std::get<char>(value) << std::endl;
+                std::cout << std::get<char>(value);
             } else if (std::holds_alternative<std::string>(value)) {
-                std::cout << std::get<std::string>(value) << std::endl;
+                std::cout << std::get<std::string>(value);
             } else if (std::holds_alternative<bool>(value)) {
-                std::cout << (std::get<bool>(value) ? "true" : "false") << std::endl;
+                std::cout << (std::get<bool>(value) ? "true" : "false");
             } else if (std::holds_alternative<float>(value)) {
-                std::cout << std::get<float>(value) << std::endl;
+                std::cout << std::get<float>(value);
             } else if (std::holds_alternative<double>(value)) {
-                std::cout << std::get<double>(value) << std::endl;
+                std::cout << std::get<double>(value);
             } else {
-                std::cout << "undefined" << std::endl;
+                std::cout << "undefined";
             }
         }
+        std::cout << std::endl;
     } else if (call->objectName == "System" && call->methodName == "input") {
         // Handle System.input
         if (!call->arguments.empty()) {
@@ -498,12 +524,66 @@ Value executeFunctionCall(FunctionCall* call) {
         }
         
         // Execute function body
+        Value returnValue = std::monostate{};
         for (auto stmt : func->body) {
-            executeStatement(stmt);
+            bool shouldReturn = false;
+            Value stmtResult = executeStatement(stmt, &shouldReturn);
+            if (shouldReturn) {
+                returnValue = stmtResult;
+                break;
+            }
         }
         
         // Restore saved variable environment
         variables = savedVariables;
+        
+        return returnValue;
+    } else {
+        // Namespace function call (e.g., Test:add)
+        std::string namespaceName = call->objectName;
+        std::string funcName = call->methodName;
+        
+        // Check if namespace exists
+        if (namespaces.find(namespaceName) == namespaces.end()) {
+            throw std::runtime_error("Undefined namespace: " + namespaceName);
+        }
+        
+        // Check if function exists in namespace
+        if (namespaces[namespaceName].find(funcName) == namespaces[namespaceName].end()) {
+            throw std::runtime_error("Undefined function in namespace " + namespaceName + ": " + funcName);
+        }
+        
+        FunctionDeclaration* func = namespaces[namespaceName][funcName];
+        
+        // Save current variable environment
+        auto savedVariables = variables;
+        
+        // Handle function arguments
+        if (call->arguments.size() != func->parameters.size()) {
+            throw std::runtime_error("Function " + namespaceName + ":" + funcName + " expects " + std::to_string(func->parameters.size()) + " arguments, but got " + std::to_string(call->arguments.size()));
+        }
+        
+        // Assign argument values to parameters
+        for (size_t i = 0; i < call->arguments.size(); ++i) {
+            Value argValue = executeExpression(call->arguments[i]);
+            variables[func->parameters[i].name] = argValue;
+        }
+        
+        // Execute function body
+        Value returnValue = std::monostate{};
+        for (auto stmt : func->body) {
+            bool shouldReturn = false;
+            Value stmtResult = executeStatement(stmt, &shouldReturn);
+            if (shouldReturn) {
+                returnValue = stmtResult;
+                break;
+            }
+        }
+        
+        // Restore saved variable environment
+        variables = savedVariables;
+        
+        return returnValue;
     }
     
     // Default return value

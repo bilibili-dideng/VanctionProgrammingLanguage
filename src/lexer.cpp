@@ -248,6 +248,17 @@ Token Lexer::getNextToken() {
         return parseCharLiteral();
     }
     
+    // Check for colon (namespace access operator)
+    if (current == ':') {
+        advance();
+        Token token;
+        token.type = COLON;
+        token.value = ":";
+        token.line = line;
+        token.column = column - 1;
+        return token;
+    }
+    
     // Check for comma
     if (current == ',') {
         advance();
@@ -319,7 +330,7 @@ Token Lexer::parseIdentifierOrKeyword() {
         value == "float" || value == "double" || value == "AND" || value == "OR" || value == "XOR" ||
         // Control flow keywords
         value == "if" || value == "else" || value == "else-if" || value == "for" || value == "while" || value == "do" ||
-        value == "switch" || value == "case" || value == "in" || value == "return") {
+        value == "switch" || value == "case" || value == "in" || value == "return" || value == "namespace") {
         token.type = KEYWORD;
         token.value = value;
         if (debugMode) {

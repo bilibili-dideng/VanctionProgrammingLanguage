@@ -11,32 +11,97 @@ Parser::Parser(Lexer& lexer) {
 
 // Parse program (validate syntax)
 bool Parser::parseProgram() {
-    // Program should start with main function
-    if (parseFunction()) {
-        // Check if it's main function
-        if (functionName == "main") {
-            return true;
+    // Parse all declarations until end of file
+    while (currentToken.type != EOF_TOKEN) {
+        if (currentToken.type == KEYWORD && currentToken.value == "func") {
+            if (parseFunction()) {
+                // Check if it's main function
+                if (functionName == "main") {
+                    return true;
+                }
+            }
+        } else if (currentToken.type == KEYWORD && currentToken.value == "namespace") {
+            // Skip namespace declaration
+            consume(KEYWORD);
+            consume(IDENTIFIER);
+            consume(LBRACE);
+            
+            // Skip all content until matching right brace
+            int braceCount = 1;
+            while (currentToken.type != EOF_TOKEN && braceCount > 0) {
+                if (currentToken.type == LBRACE) {
+                    braceCount++;
+                } else if (currentToken.type == RBRACE) {
+                    braceCount--;
+                }
+                currentToken = lexer->getNextToken();
+            }
         } else {
-            std::cerr << "Error: Program must start with main function" << std::endl;
-            return false;
+            // If it's not a function or namespace declaration, skip this token and continue
+            currentToken = lexer->getNextToken();
         }
     }
+    
     return false;
+}
+
+// Parse namespace declaration and generate AST
+NamespaceDeclaration* Parser::parseNamespaceDeclarationAST() {
+    // Consume 'namespace' keyword
+    consume(KEYWORD);
+    
+    // Parse namespace name
+    std::string name = currentToken.value;
+    consume(IDENTIFIER);
+    
+    // Parse left brace
+    consume(LBRACE);
+    
+    // Create namespace declaration node
+    auto ns = new NamespaceDeclaration(name);
+    
+    // Parse declarations inside namespace until right brace
+    while (currentToken.type != RBRACE && currentToken.type != EOF_TOKEN) {
+        if (currentToken.type == KEYWORD && currentToken.value == "func") {
+            auto func = parseFunctionAST();
+            if (func) {
+                ns->declarations.push_back(func);
+            }
+        } else if (currentToken.type == KEYWORD && currentToken.value == "namespace") {
+            auto nestedNs = parseNamespaceDeclarationAST();
+            if (nestedNs) {
+                ns->declarations.push_back(nestedNs);
+            }
+        } else {
+            // If it's not a function or namespace declaration, skip this token and continue
+            currentToken = lexer->getNextToken();
+        }
+    }
+    
+    // Parse right brace
+    consume(RBRACE);
+    
+    return ns;
 }
 
 // Parse program and generate AST
 Program* Parser::parseProgramAST() {
     auto program = new Program();
     
-    // Parse all function definitions until end of file
+    // Parse all declarations until end of file
     while (currentToken.type != EOF_TOKEN) {
         if (currentToken.type == KEYWORD && currentToken.value == "func") {
             auto func = parseFunctionAST();
             if (func) {
                 program->declarations.push_back(func);
             }
+        } else if (currentToken.type == KEYWORD && currentToken.value == "namespace") {
+            auto ns = parseNamespaceDeclarationAST();
+            if (ns) {
+                program->declarations.push_back(ns);
+            }
         } else {
-            // If it's not a function declaration, skip this token and continue
+            // If it's not a function or namespace declaration, skip this token and continue
             currentToken = lexer->getNextToken();
         }
     }
@@ -825,8 +890,54 @@ Expression* Parser::parsePrimaryExpression() {
         std::string name = currentToken.value;
         currentToken = lexer->getNextToken();
         
+        // Check if it's a namespace access (e.g., namespace:member)
+        if (currentToken.type == COLON) {
+            // It's a namespace access, consume colon
+            currentToken = lexer->getNextToken();
+            
+            // Parse member name
+            std::string memberName = currentToken.value;
+            currentToken = lexer->getNextToken();
+            
+            // Check if it's a function call (e.g., namespace:func())
+            if (currentToken.type == LPAREN) {
+                // It's a function call using namespace access
+                consume(LPAREN);
+                
+                // Create function call node
+                auto call = new FunctionCall(name, memberName);
+                
+                // Parse arguments
+                if (currentToken.type != RPAREN) {
+                    auto arg = parseExpression();
+                    if (arg) {
+                        call->arguments.push_back(arg);
+                    }
+                    
+                    // Parse additional arguments separated by commas
+                    while (currentToken.type == IDENTIFIER && currentToken.value == ",") {
+                        // Consume comma
+                        currentToken = lexer->getNextToken();
+                        
+                        // Parse next argument
+                        arg = parseExpression();
+                        if (arg) {
+                            call->arguments.push_back(arg);
+                        }
+                    }
+                }
+                
+                // Expect right parenthesis
+                consume(RPAREN);
+                
+                return call;
+            } else {
+                // It's a simple namespace access
+                return new NamespaceAccess(name, memberName);
+            }
+        }
         // Check if it's a method call (e.g., System.print)
-        if (currentToken.type == DOT) {
+        else if (currentToken.type == DOT) {
             // It's a method call, parse it as function call
             currentToken = lexer->getNextToken(); // consume dot
             
@@ -1053,6 +1164,7 @@ std::string Parser::tokenTypeToString(TokenType type) {
         case FLOAT_LITERAL: return "float literal";
         case DOUBLE_LITERAL: return "double literal";
         case DOT: return "dot";
+        case COLON: return "colon";
         case SEMICOLON: return "semicolon";
         case LPAREN: return "left parenthesis";
         case RPAREN: return "right parenthesis";

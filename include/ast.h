@@ -350,6 +350,32 @@ public:
     }
 };
 
+// Namespace declaration node
+class NamespaceDeclaration : public ASTNode {
+public:
+    std::string name;
+    std::vector<ASTNode*> declarations;
+    
+    NamespaceDeclaration(const std::string& name)
+        : name(name) {}
+    
+    ~NamespaceDeclaration() {
+        for (auto node : declarations) {
+            delete node;
+        }
+    }
+};
+
+// Namespace access expression
+class NamespaceAccess : public Expression {
+public:
+    std::string namespaceName;
+    std::string memberName;
+    
+    NamespaceAccess(const std::string& namespaceName, const std::string& memberName)
+        : namespaceName(namespaceName), memberName(memberName) {}
+};
+
 // Program node
 class Program : public ASTNode {
 public:

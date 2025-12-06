@@ -346,6 +346,47 @@ System.print("Hello, " + name + "!");
 string input = System.input("");
 ```
 
+### 4.8 Namespaces
+
+Namespaces are used to organize code and avoid name collisions. They allow you to group related functions together under a common name.
+
+#### 4.8.1 Namespace Declaration
+
+```vanction
+| Namespace declaration syntax
+namespace NamespaceName {
+    | Functions and other declarations go here
+}
+
+| Example
+namespace Math {
+    func add(a, b) {
+        return a + b;
+    }
+    
+    func multiply(a, b) {
+        return a * b;
+    }
+}
+```
+
+#### 4.8.2 Accessing Namespace Members
+
+To access a function or variable within a namespace, use the colon operator `:`:
+
+```vanction
+| Accessing namespace members
+result = NamespaceName:memberName;
+
+| Example
+func main() {
+    int sum = Math:add(3, 4);
+    int product = Math:multiply(3, 4);
+    System.print("Sum: ", sum);
+    System.print("Product: ", product);
+}
+```
+
 ## 5. Error Handling
 
 Vanction has a comprehensive error handling system that provides clear and formatted error messages. When an error occurs, the interpreter/compiler will display:
@@ -488,15 +529,13 @@ func main() {
 
 ## 9. Known Limitations
 
-1. Does not support custom functions
-2. Does not support arrays and structures
-3. Only supports single-line comments
-4. String operations only support `+` concatenation operator
-5. for-in loops only support string iteration
+1. Does not support arrays and structures
+2. Only supports single-line comments
+3. String operations only support `+` concatenation operator
+4. for-in loops only support string iteration
 
 ## 10. Future Plans
 
-- Support custom functions
 - Support arrays and structures
 - Support multi-line comments
 - Add more system functions
@@ -512,7 +551,8 @@ VanctionProgramLanguage/
 │   ├── DEVELOPMENT.md   | Development documentation (English)
 │   └── ZH_DEVELOPMENT.md| Development documentation (Chinese)
 ├── examples/            | Example programs
-│   └── hello_world.vn   | Hello World example
+│   ├── hello_world.vn   | Hello World example
+│   └── namespace_test.vn | Namespace functionality example
 ├── include/             | Public header files
 │   ├── ast.h            | Abstract Syntax Tree definitions
 │   └── token.h          | Token definitions

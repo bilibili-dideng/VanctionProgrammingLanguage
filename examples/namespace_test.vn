@@ -1,0 +1,18 @@
+| Test file for namespace functionality
+
+namespace Test {
+    func add(a, b) {
+        return a + b;
+    }
+    
+    func multiply(a, b) {
+        return a * b;
+    }
+}
+
+func main() {
+    System.print("Testing namespace functionality...");
+    System.print("Test:add(3, 4) = ", Test:add(3, 4));
+    System.print("Test:multiply(3, 4) = ", Test:multiply(3, 4));
+    return 0;
+}

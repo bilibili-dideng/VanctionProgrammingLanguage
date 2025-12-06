@@ -346,6 +346,47 @@ System.print("你好，" + name + "!");
 string input = System.input("");
 ```
 
+### 4.8 命名空间
+
+命名空间用于组织代码并避免命名冲突，允许你将相关函数分组到一个共同的名称下。
+
+#### 4.8.1 命名空间声明
+
+```vanction
+| 命名空间声明语法
+namespace 命名空间名称 {
+    | 函数和其他声明放在这里
+}
+
+| 示例
+namespace Math {
+    func add(a, b) {
+        return a + b;
+    }
+    
+    func multiply(a, b) {
+        return a * b;
+    }
+}
+```
+
+#### 4.8.2 访问命名空间成员
+
+要访问命名空间中的函数或变量，使用冒号运算符 `:`：
+
+```vanction
+| 访问命名空间成员
+result = 命名空间名称:成员名称;
+
+| 示例
+func main() {
+    int sum = Math:add(3, 4);
+    int product = Math:multiply(3, 4);
+    System.print("Sum: ", sum);
+    System.print("Product: ", product);
+}
+```
+
 ## 5. 错误处理
 
 Vanction 拥有完善的错误处理系统，提供清晰格式化的错误信息。当错误发生时，解释器/编译器将显示：
@@ -488,15 +529,13 @@ func main() {
 
 ## 9. 已知限制
 
-1. 不支持自定义函数
-2. 不支持数组和结构体
-3. 仅支持单行注释
-4. 字符串操作仅支持 `+` 拼接运算符
-5. for-in 循环仅支持字符串迭代
+1. 不支持数组和结构体
+2. 仅支持单行注释
+3. 字符串操作仅支持 `+` 拼接运算符
+4. for-in 循环仅支持字符串迭代
 
 ## 10. 未来计划
 
-- 支持自定义函数
 - 支持数组和结构体
 - 支持多行注释
 - 添加更多系统函数
@@ -512,7 +551,8 @@ VanctionProgramLanguage/
 │   ├── DEVELOPMENT.md   | 开发文档 (英文)
 │   └── ZH_DEVELOPMENT.md| 开发文档 (中文)
 ├── examples/            | 示例程序
-│   └── hello_world.vn   | Hello World 示例
+│   ├── hello_world.vn   | Hello World 示例
+│   └── namespace_test.vn | 命名空间功能示例
 ├── include/             | 公共头文件
 │   ├── ast.h            | 抽象语法树定义
 │   └── token.h          | 标记定义

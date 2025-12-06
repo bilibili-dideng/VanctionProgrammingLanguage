@@ -53,6 +53,12 @@ private:
     // Generate function call
     std::string generateFunctionCall(FunctionCall* call);
     
+    // Generate namespace declaration
+    std::string generateNamespaceDeclaration(NamespaceDeclaration* ns);
+    
+    // Generate namespace access
+    std::string generateNamespaceAccess(NamespaceAccess* access);
+    
     // Generate comment
     std::string generateComment(Comment* comment);
     

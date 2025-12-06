@@ -2,6 +2,28 @@
 #include "../include/ast.h"
 #include <iostream>
 
+// Generate namespace declaration
+std::string CodeGenerator::generateNamespaceDeclaration(NamespaceDeclaration* ns) {
+    std::string code;
+    
+    // Generate namespace start
+    code += "namespace " + ns->name + " {\n\n";
+    
+    // Generate declarations inside namespace
+    for (auto decl : ns->declarations) {
+        if (auto func = dynamic_cast<FunctionDeclaration*>(decl)) {
+            code += generateFunctionDeclaration(func);
+        } else if (auto nestedNs = dynamic_cast<NamespaceDeclaration*>(decl)) {
+            code += generateNamespaceDeclaration(nestedNs);
+        }
+    }
+    
+    // Generate namespace end
+    code += "}\n\n";
+    
+    return code;
+}
+
 // Generate C++ code
 std::string CodeGenerator::generate(Program* program) {
     std::string code;
@@ -13,6 +35,8 @@ std::string CodeGenerator::generate(Program* program) {
     for (auto decl : program->declarations) {
         if (auto func = dynamic_cast<FunctionDeclaration*>(decl)) {
             code += generateFunctionDeclaration(func);
+        } else if (auto ns = dynamic_cast<NamespaceDeclaration*>(decl)) {
+            code += generateNamespaceDeclaration(ns);
         }
     }
     
@@ -140,10 +164,17 @@ std::string CodeGenerator::generateVariableDeclaration(VariableDeclaration* varD
     return code;
 }
 
+// Generate namespace access
+std::string CodeGenerator::generateNamespaceAccess(NamespaceAccess* access) {
+    return access->namespaceName + "::" + access->memberName;
+}
+
 // Generate expression
 std::string CodeGenerator::generateExpression(Expression* expr) {
     if (auto ident = dynamic_cast<Identifier*>(expr)) {
         return generateIdentifier(ident);
+    } else if (auto nsAccess = dynamic_cast<NamespaceAccess*>(expr)) {
+        return generateNamespaceAccess(nsAccess);
     } else if (auto intLit = dynamic_cast<IntegerLiteral*>(expr)) {
         return generateIntegerLiteral(intLit);
     } else if (auto floatLit = dynamic_cast<FloatLiteral*>(expr)) {
@@ -476,6 +507,20 @@ std::string CodeGenerator::generateFunctionCall(FunctionCall* call) {
     } else if (call->objectName.empty()) {
         // Regular function call (e.g., myFunction())
         std::string code = call->methodName + "(";
+        
+        // Generate arguments
+        for (size_t i = 0; i < call->arguments.size(); ++i) {
+            code += generateExpression(call->arguments[i]);
+            if (i < call->arguments.size() - 1) {
+                code += ", ";
+            }
+        }
+        
+        code += ")";
+        return code;
+    } else {
+        // Namespace function call (e.g., Test:add)
+        std::string code = call->objectName + "::" + call->methodName + "(";
         
         // Generate arguments
         for (size_t i = 0; i < call->arguments.size(); ++i) {

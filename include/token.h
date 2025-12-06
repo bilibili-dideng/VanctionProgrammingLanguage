@@ -13,6 +13,7 @@ enum TokenType {
     FLOAT_LITERAL,
     DOUBLE_LITERAL,
     DOT,
+    COLON,
     SEMICOLON,
     LPAREN,
     RPAREN,
