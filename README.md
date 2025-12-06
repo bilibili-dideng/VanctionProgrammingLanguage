@@ -420,40 +420,44 @@ func main() {
 
 ## 8. Known Limitations
 
-1. Does not support control flow statements (if-else, for, while)
-2. Does not support custom functions
-3. Does not support arrays and structures
-4. Only supports single-line comments
-5. String operations only support `+` concatenation operator
+1. Does not support custom functions
+2. Does not support arrays and structures
+3. Only supports single-line comments
+4. String operations only support `+` concatenation operator
+5. for-in loops only support string iteration
 
 ## 9. Future Plans
 
-- Support control flow statements (if-else, for, while)
 - Support custom functions
 - Support arrays and structures
 - Support multi-line comments
 - Add more system functions
 - Optimize error messages
+- Expand for-in loop support to other collection types
 
 ## 10. Project Structure
 
 ```
 VanctionProgramLanguage/
 ├── .idea/              | IDE configuration files
+├── .trae/              | Trae IDE configuration
 ├── build/              | Build output directory
 ├── doc/                | Documentation directory
 ├── examples/           | Example programs
 ├── include/            | Header files
-├── mingw64/            | GCC compiler
 ├── src/                | Source code
 ├── .gitignore          | Git ignore configuration
 ├── CMakeLists.txt      | CMake configuration
-└── README.md           | Project documentation
+├── LICENSE             | Project license (LGPL2.0)
+├── README.md           | Project documentation (English)
+└── ZH_README.md        | Project documentation (Chinese)
 ```
+
+**Important Note:** Compilation mode requires mingw64 to be installed. Ensure the `mingw64` directory is in the same directory as `vanction.exe` or properly configured in your system PATH.
 
 ## 11. License
 
-This project is licensed under the MIT License.
+This project is licensed under the LGPL2.0 License.
 
 ## 12. Contributions
 

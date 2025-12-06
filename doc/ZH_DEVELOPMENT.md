@@ -41,7 +41,14 @@ Vanction 是一种简单的编译型编程语言，支持编译为可执行文�
   - `parseMultiplicativeExpression()`：解析乘法表达式
   - `parseAdditiveExpression()`：解析加法表达式
   - `parseBitShiftExpression()`：解析位移表达式
+  - `parseRelationalExpression()`：解析关系表达式（比较运算符）
   - `parseLogicalExpression()`：解析逻辑表达式
+  - `parseIfStatement()`：解析 if-else-if-else 语句
+  - `parseForLoopStatement()`：解析传统 for 循环
+  - `parseForInLoopStatement()`：解析 for-in 循环
+  - `parseWhileLoopStatement()`：解析 while 循环
+  - `parseDoWhileLoopStatement()`：解析 do-while 循环
+  - `parseSwitchStatement()`：解析 switch 语句
 
 ### 3.3 抽象语法树（AST）
 
@@ -53,8 +60,16 @@ Vanction 是一种简单的编译型编程语言，支持编译为可执行文�
   - `VariableDeclaration`：变量声明
   - `ExpressionStatement`：表达式语句
   - `FunctionCall`：函数调用
-  - `BinaryExpression`：二元表达式（支持+、-、*、/、<<、>>、AND、OR、XOR）
+  - `BinaryExpression`：二元表达式（支持+、-、*、/、<<、>>、==、!=、<、<=、>、>=、AND、OR、XOR）
   - `AssignmentExpression`：赋值表达式
+  - `IfStatement`：if-else-if-else 语句
+  - `ForLoopStatement`：传统 for 循环
+  - `ForInLoopStatement`：for-in 循环
+  - `WhileLoopStatement`：while 循环
+  - `DoWhileLoopStatement`：do-while 循环
+  - `SwitchStatement`：switch 语句
+  - `CaseStatement`：switch 语句中的 case 标签
+  - `Comment`：注释节点
   - 各种字面量节点：`IntegerLiteral`, `CharLiteral`, `StringLiteral`, `BooleanLiteral`, `FloatLiteral`, `DoubleLiteral`
 
 ### 3.4 代码生成器（CodeGenerator）
@@ -65,6 +80,7 @@ Vanction 是一种简单的编译型编程语言，支持编译为可执行文�
   - `generate()`：生成整个程序的 C++ 代码
   - `generateFunctionDeclaration()`：生成函数声明的 C++ 代码
   - `generateVariableDeclaration()`：生成变量声明的 C++ 代码
+  - `generateStatement()`：生成语句的 C++ 代码
   - `generateExpression()`：生成表达式的 C++ 代码
   - `generateIdentifier()`：生成标识符的 C++ 代码
   - `generateIntegerLiteral()`：生成整数字面量的 C++ 代码
@@ -76,6 +92,12 @@ Vanction 是一种简单的编译型编程语言，支持编译为可执行文�
   - `generateBinaryExpression()`：生成二元表达式的 C++ 代码
   - `generateAssignmentExpression()`：生成赋值表达式的 C++ 代码
   - `generateFunctionCall()`：生成函数调用的 C++ 代码
+  - `generateIfStatement()`：生成 if-else-if-else 语句的 C++ 代码
+  - `generateForLoopStatement()`：生成传统 for 循环的 C++ 代码
+  - `generateForInLoopStatement()`：生成 for-in 循环的 C++ 代码
+  - `generateWhileLoopStatement()`：生成 while 循环的 C++ 代码
+  - `generateDoWhileLoopStatement()`：生成 do-while 循环的 C++ 代码
+  - `generateSwitchStatement()`：生成 switch 语句的 C++ 代码
 
 ### 3.5 解释器
 
@@ -100,6 +122,7 @@ Vanction 是一种简单的编译型编程语言，支持编译为可执行文�
 - **支持的运算符**：
   - 算术运算符：+、-、*、/
   - 位运算符：<<、>>
+  - 比较运算符：==、!=、<、<=、>、>=
   - 逻辑运算符：AND、OR、XOR
   - 赋值运算符：=
 
@@ -182,7 +205,6 @@ cmake --build .
 
 ## 9. 未来发展方向
 
-- 支持控制流语句（if-else, for, while）
 - 支持自定义函数
 - 支持数组和结构体
 - 支持模块系统

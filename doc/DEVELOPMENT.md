@@ -41,7 +41,14 @@ Vanction is a simple compiled programming language that supports compiling to ex
   - `parseMultiplicativeExpression()`: Parse multiplicative expression
   - `parseAdditiveExpression()`: Parse additive expression
   - `parseBitShiftExpression()`: Parse bit shift expression
+  - `parseRelationalExpression()`: Parse relational expression (comparison operators)
   - `parseLogicalExpression()`: Parse logical expression
+  - `parseIfStatement()`: Parse if-else-if-else statement
+  - `parseForLoopStatement()`: Parse traditional for loop
+  - `parseForInLoopStatement()`: Parse for-in loop
+  - `parseWhileLoopStatement()`: Parse while loop
+  - `parseDoWhileLoopStatement()`: Parse do-while loop
+  - `parseSwitchStatement()`: Parse switch statement
 
 ### 3.3 Abstract Syntax Tree (AST)
 
@@ -53,8 +60,16 @@ Vanction is a simple compiled programming language that supports compiling to ex
   - `VariableDeclaration`: Variable declaration
   - `ExpressionStatement`: Expression statement
   - `FunctionCall`: Function call
-  - `BinaryExpression`: Binary expression (supports +, -, *, /, <<, >>, AND, OR, XOR)
+  - `BinaryExpression`: Binary expression (supports +, -, *, /, <<, >>, ==, !=, <, <=, >, >=, AND, OR, XOR)
   - `AssignmentExpression`: Assignment expression
+  - `IfStatement`: if-else-if-else statement
+  - `ForLoopStatement`: Traditional for loop
+  - `ForInLoopStatement`: for-in loop
+  - `WhileLoopStatement`: while loop
+  - `DoWhileLoopStatement`: do-while loop
+  - `SwitchStatement`: switch statement
+  - `CaseStatement`: case label in switch statement
+  - `Comment`: Comment node
   - Various literal nodes: `IntegerLiteral`, `CharLiteral`, `StringLiteral`, `BooleanLiteral`, `FloatLiteral`, `DoubleLiteral`
 
 ### 3.4 Code Generator (CodeGenerator)
@@ -65,6 +80,7 @@ Vanction is a simple compiled programming language that supports compiling to ex
   - `generate()`: Generate C++ code for the entire program
   - `generateFunctionDeclaration()`: Generate C++ code for function declaration
   - `generateVariableDeclaration()`: Generate C++ code for variable declaration
+  - `generateStatement()`: Generate C++ code for statement
   - `generateExpression()`: Generate C++ code for expression
   - `generateIdentifier()`: Generate C++ code for identifier
   - `generateIntegerLiteral()`: Generate C++ code for integer literal
@@ -76,6 +92,12 @@ Vanction is a simple compiled programming language that supports compiling to ex
   - `generateBinaryExpression()`: Generate C++ code for binary expression
   - `generateAssignmentExpression()`: Generate C++ code for assignment expression
   - `generateFunctionCall()`: Generate C++ code for function call
+  - `generateIfStatement()`: Generate C++ code for if-else-if-else statement
+  - `generateForLoopStatement()`: Generate C++ code for traditional for loop
+  - `generateForInLoopStatement()`: Generate C++ code for for-in loop
+  - `generateWhileLoopStatement()`: Generate C++ code for while loop
+  - `generateDoWhileLoopStatement()`: Generate C++ code for do-while loop
+  - `generateSwitchStatement()`: Generate C++ code for switch statement
 
 ### 3.5 Interpreter
 
@@ -100,6 +122,7 @@ Vanction is a simple compiled programming language that supports compiling to ex
 - **Supported Operators**:
   - Arithmetic operators: +, -, *, /
   - Bitwise operators: <<, >>
+  - Comparison operators: ==, !=, <, <=, >, >=
   - Logical operators: AND, OR, XOR
   - Assignment operator: =
 
@@ -182,7 +205,6 @@ cmake --build .
 
 ## 9. Future Development Directions
 
-- Support control flow statements (if-else, for, while)
 - Support custom functions
 - Support arrays and structures
 - Support module system

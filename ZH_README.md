@@ -132,14 +132,25 @@ f = 6.28;
 | * | 乘法 | `a * b` |
 | / | 除法 | `a / b` |
 
-#### 4.4.2 位运算符
+#### 4.4.2 比较运算符
+
+| 运算符 | 描述 | 示例 |
+|--------|------|------|
+| == | 等于 | `a == b` |
+| != | 不等于 | `a != b` |
+| < | 小于 | `a < b` |
+| <= | 小于等于 | `a <= b` |
+| > | 大于 | `a > b` |
+| >= | 大于等于 | `a >= b` |
+
+#### 4.4.3 位运算符
 
 | 运算符 | 描述 | 示例 |
 |--------|------|------|
 | << | 左移 | `a << 1` |
 | >> | 右移 | `a >> 1` |
 
-#### 4.4.3 逻辑运算符
+#### 4.4.4 逻辑运算符
 
 | 运算符 | 描述 | 示例 |
 |--------|------|------|
@@ -147,7 +158,125 @@ f = 6.28;
 | OR | 逻辑或 | `a OR b` |
 | XOR | 逻辑异或 | `a XOR b` |
 
-### 4.5 类型转换
+### 4.5 控制流语句
+
+#### 4.5.1 if-else-if-else 语句
+
+```vanction
+| 简单 if 语句
+if (条件) {
+    | 代码块
+}
+
+| if-else 语句
+if (条件) {
+    | 代码块
+} else {
+    | 代码块
+}
+
+| if-else-if-else 语句
+if (条件1) {
+    | 代码块1
+} else-if (条件2) {
+    | 代码块2
+} else {
+    | 代码块3
+}
+```
+
+#### 4.5.2 for 循环
+
+```vanction
+| 传统 for 循环
+for (初始化; 条件; 递增) {
+    | 代码块
+}
+
+| 示例
+for (i = 1; i <= 3; i = i + 1) {
+    System.print(i);
+}
+```
+
+#### 4.5.3 for-in 循环
+
+```vanction
+| 用于字符串迭代的 for-in 循环
+for (char c in 字符串) {
+    | 代码块
+}
+
+| 示例
+string s = "abc";
+for (char c in s) {
+    System.print(c);
+}
+```
+
+#### 4.5.4 while 循环
+
+```vanction
+| while 循环
+while (条件) {
+    | 代码块
+}
+
+| 示例
+auto i = 1;
+while (i <= 3) {
+    System.print(i);
+    i = i + 1;
+}
+```
+
+#### 4.5.5 do-while 循环
+
+```vanction
+| do-while 循环
+| 保证至少执行一次
+do {
+    | 代码块
+} while(条件)
+
+| 示例
+auto i = 1;
+do {
+    System.print(i);
+    i = i + 1;
+} while(i <= 3)
+```
+
+#### 4.5.6 switch 语句
+
+```vanction
+| switch 语句
+switch(表达式) {
+    case 值1 {
+        | 代码块1
+    }
+    case 值2 {
+        | 代码块2
+    }
+    // 更多 case...
+}
+
+| 示例
+auto num = 2;
+switch(num) {
+    case 1 {
+        System.print("One");
+    }
+    case 2 {
+        System.print("Two");
+    }
+    case 3 {
+        System.print("Three");
+    }
+}
+```
+
+### 4.6 类型转换
 
 Vanction 提供了类型转换函数，用于在不同数据类型之间转换：
 
@@ -165,9 +294,9 @@ double d = type.double(b);
 string s = type.string(b);
 ```
 
-### 4.6 输入输出
+### 4.7 输入输出
 
-#### 4.6.1 输出
+#### 4.7.1 输出
 
 ```vanction
 | 输出字符串
@@ -182,7 +311,7 @@ string name = "Vanction";
 System.print("Hello, " + name + "!");
 ```
 
-#### 4.6.2 输入
+#### 4.7.2 输入
 
 ```vanction
 | 获取用户输入，带提示信息
@@ -291,40 +420,44 @@ func main() {
 
 ## 8. 已知限制
 
-1. 不支持控制流语句（if-else, for, while）
-2. 不支持自定义函数
-3. 不支持数组和结构体
-4. 仅支持单行注释
-5. 字符串操作仅支持 `+` 拼接运算符
+1. 不支持自定义函数
+2. 不支持数组和结构体
+3. 仅支持单行注释
+4. 字符串操作仅支持 `+` 拼接运算符
+5. for-in 循环仅支持字符串迭代
 
 ## 9. 未来计划
 
-- 支持控制流语句（if-else, for, while）
 - 支持自定义函数
 - 支持数组和结构体
 - 支持多行注释
 - 添加更多系统函数
 - 优化错误提示
+- 扩展 for-in 循环支持到其他集合类型
 
 ## 10. 项目结构
 
 ```
 VanctionProgramLanguage/
 ├── .idea/              | IDE配置文件
+├── .trae/              | Trae IDE配置
 ├── build/              | 构建输出目录
 ├── doc/                | 文档目录
 ├── examples/           | 示例程序
 ├── include/            | 头文件
-├── mingw64/            | GCC编译器
 ├── src/                | 源代码
 ├── .gitignore          | Git忽略配置
 ├── CMakeLists.txt      | CMake配置
-└── README.md           | 项目说明文档
+├── LICENSE             | 项目许可证 (LGPL2.0)
+├── README.md           | 项目说明文档 (英文)
+└── ZH_README.md        | 项目说明文档 (中文)
 ```
+
+**重要提示：** 编译模式需要安装 mingw64。确保 `mingw64` 目录与 `vanction.exe` 处于同一目录，或者已在系统 PATH 中正确配置。
 
 ## 11. 许可证
 
-本项目采用 MIT 许可证。
+本项目采用 LGPL2.0 许可证。
 
 ## 12. 贡献
 
