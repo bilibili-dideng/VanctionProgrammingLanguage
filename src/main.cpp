@@ -54,7 +54,7 @@ std::string getFileNameWithoutExt(const std::string& filePath) {
 }
 
 // Type for variable values
-using Value = std::variant<int, char, std::string, bool, std::monostate>;
+using Value = std::variant<int, char, std::string, bool, float, double, std::monostate>;
 
 // Global variable environment
 std::map<std::string, Value> variables;
@@ -118,41 +118,98 @@ Value executeExpression(Expression* expr) {
         variables[assignExpr->left->name] = value;
         return value;
     } else if (auto binaryExpr = dynamic_cast<BinaryExpression*>(expr)) {
-        // Execute binary expression (string concatenation)
+        // Execute binary expression
         auto leftVal = executeExpression(binaryExpr->left);
         auto rightVal = executeExpression(binaryExpr->right);
         
-        // Only support string concatenation for now
+        // Handle string operations
+        if (std::holds_alternative<std::string>(leftVal) && std::holds_alternative<std::string>(rightVal)) {
+            std::string leftStr = std::get<std::string>(leftVal);
+            std::string rightStr = std::get<std::string>(rightVal);
+            
+            if (binaryExpr->op == "+") {
+                // String concatenation
+                return leftStr + rightStr;
+            } else if (binaryExpr->op == "*") {
+                // String repetition - right operand must be a number
+                // For simplicity, we'll skip this for now
+                return leftStr;
+            }
+        }
+        
+        // Handle logical operations specially
+        if (binaryExpr->op == "AND" || binaryExpr->op == "OR" || binaryExpr->op == "XOR") {
+            auto getBool = [](Value val) -> bool {
+                if (std::holds_alternative<bool>(val)) {
+                    return std::get<bool>(val);
+                } else if (std::holds_alternative<int>(val)) {
+                    return std::get<int>(val) != 0;
+                } else if (std::holds_alternative<float>(val)) {
+                    return std::get<float>(val) != 0.0f;
+                } else if (std::holds_alternative<double>(val)) {
+                    return std::get<double>(val) != 0.0;
+                } else {
+                    return false;
+                }
+            };
+            
+            bool leftBool = getBool(leftVal);
+            bool rightBool = getBool(rightVal);
+            
+            if (binaryExpr->op == "AND") {
+                return leftBool && rightBool;
+            } else if (binaryExpr->op == "OR") {
+                return leftBool || rightBool;
+            } else if (binaryExpr->op == "XOR") {
+                return leftBool != rightBool;
+            }
+        }
+        
+        // Handle numeric operations
+        auto getNumber = [](Value val) -> double {
+            if (std::holds_alternative<int>(val)) {
+                return static_cast<double>(std::get<int>(val));
+            } else if (std::holds_alternative<bool>(val)) {
+                return static_cast<double>(std::get<bool>(val));
+            } else if (std::holds_alternative<float>(val)) {
+                return static_cast<double>(std::get<float>(val));
+            } else if (std::holds_alternative<double>(val)) {
+                return std::get<double>(val);
+            } else {
+                return 0.0;
+            }
+        };
+        
+        double leftNum = getNumber(leftVal);
+        double rightNum = getNumber(rightVal);
+        double result = 0.0;
+        
         if (binaryExpr->op == "+") {
-            // Convert both values to strings
-            std::string leftStr, rightStr;
-            
-            if (std::holds_alternative<int>(leftVal)) {
-                leftStr = std::to_string(std::get<int>(leftVal));
-            } else if (std::holds_alternative<char>(leftVal)) {
-                leftStr = std::string(1, std::get<char>(leftVal));
-            } else if (std::holds_alternative<std::string>(leftVal)) {
-                leftStr = std::get<std::string>(leftVal);
-            } else if (std::holds_alternative<bool>(leftVal)) {
-                leftStr = std::get<bool>(leftVal) ? "true" : "false";
-            } else {
-                leftStr = "undefined";
-            }
-            
-            if (std::holds_alternative<int>(rightVal)) {
-                rightStr = std::to_string(std::get<int>(rightVal));
-            } else if (std::holds_alternative<char>(rightVal)) {
-                rightStr = std::string(1, std::get<char>(rightVal));
-            } else if (std::holds_alternative<std::string>(rightVal)) {
-                rightStr = std::get<std::string>(rightVal);
-            } else if (std::holds_alternative<bool>(rightVal)) {
-                rightStr = std::get<bool>(rightVal) ? "true" : "false";
-            } else {
-                rightStr = "undefined";
-            }
-            
-            // Concatenate strings
-            return leftStr + rightStr;
+            result = leftNum + rightNum;
+        } else if (binaryExpr->op == "-") {
+            result = leftNum - rightNum;
+        } else if (binaryExpr->op == "*") {
+            result = leftNum * rightNum;
+        } else if (binaryExpr->op == "/") {
+            result = leftNum / rightNum;
+        } else if (binaryExpr->op == "<<") {
+            // Bit shift operations - cast to int
+            result = static_cast<double>(static_cast<int>(leftNum) << static_cast<int>(rightNum));
+        } else if (binaryExpr->op == ">>") {
+            // Bit shift operations - cast to int
+            result = static_cast<double>(static_cast<int>(leftNum) >> static_cast<int>(rightNum));
+        }
+        
+        // Determine result type based on operands
+        if (std::holds_alternative<int>(leftVal) && std::holds_alternative<int>(rightVal)) {
+            // Both operands are integers - result is integer
+            return static_cast<int>(result);
+        } else if (std::holds_alternative<float>(leftVal) || std::holds_alternative<float>(rightVal)) {
+            // At least one float operand - result is float
+            return static_cast<float>(result);
+        } else {
+            // Default to double
+            return result;
         }
     } else if (auto ident = dynamic_cast<Identifier*>(expr)) {
         // Get variable value
@@ -165,6 +222,12 @@ Value executeExpression(Expression* expr) {
     } else if (auto intLit = dynamic_cast<IntegerLiteral*>(expr)) {
         // Integer literal
         return intLit->value;
+    } else if (auto floatLit = dynamic_cast<FloatLiteral*>(expr)) {
+        // Float literal
+        return floatLit->value;
+    } else if (auto doubleLit = dynamic_cast<DoubleLiteral*>(expr)) {
+        // Double literal
+        return doubleLit->value;
     } else if (auto charLit = dynamic_cast<CharLiteral*>(expr)) {
         // Char literal
         return charLit->value;
@@ -196,6 +259,12 @@ Value executeFunctionCall(FunctionCall* call) {
                 std::cout << std::get<std::string>(value) << std::endl;
             } else if (std::holds_alternative<bool>(value)) {
                 std::cout << (std::get<bool>(value) ? "true" : "false") << std::endl;
+            } else if (std::holds_alternative<float>(value)) {
+                std::cout << std::get<float>(value) << std::endl;
+            } else if (std::holds_alternative<double>(value)) {
+                std::cout << std::get<double>(value) << std::endl;
+            } else {
+                std::cout << "undefined" << std::endl;
             }
         }
     } else if (call->objectName == "System" && call->methodName == "input") {
@@ -214,6 +283,84 @@ Value executeFunctionCall(FunctionCall* call) {
         
         // Return input as string
         return input;
+    } else if (call->objectName == "type") {
+        // Handle type conversion functions
+        if (call->arguments.empty()) {
+            return std::monostate{};
+        }
+        
+        Value arg = executeExpression(call->arguments[0]);
+        
+        if (call->methodName == "int") {
+            // Convert to int
+            if (std::holds_alternative<int>(arg)) {
+                return arg;
+            } else if (std::holds_alternative<float>(arg)) {
+                return static_cast<int>(std::get<float>(arg));
+            } else if (std::holds_alternative<double>(arg)) {
+                return static_cast<int>(std::get<double>(arg));
+            } else if (std::holds_alternative<bool>(arg)) {
+                return static_cast<int>(std::get<bool>(arg));
+            } else if (std::holds_alternative<std::string>(arg)) {
+                // Try to parse string as int
+                try {
+                    return std::stoi(std::get<std::string>(arg));
+                } catch (...) {
+                    return 0;
+                }
+            }
+        } else if (call->methodName == "float") {
+            // Convert to float
+            if (std::holds_alternative<int>(arg)) {
+                return static_cast<float>(std::get<int>(arg));
+            } else if (std::holds_alternative<float>(arg)) {
+                return arg;
+            } else if (std::holds_alternative<double>(arg)) {
+                return static_cast<float>(std::get<double>(arg));
+            } else if (std::holds_alternative<bool>(arg)) {
+                return static_cast<float>(std::get<bool>(arg));
+            } else if (std::holds_alternative<std::string>(arg)) {
+                // Try to parse string as float
+                try {
+                    return std::stof(std::get<std::string>(arg));
+                } catch (...) {
+                    return 0.0f;
+                }
+            }
+        } else if (call->methodName == "double") {
+            // Convert to double
+            if (std::holds_alternative<int>(arg)) {
+                return static_cast<double>(std::get<int>(arg));
+            } else if (std::holds_alternative<float>(arg)) {
+                return static_cast<double>(std::get<float>(arg));
+            } else if (std::holds_alternative<double>(arg)) {
+                return arg;
+            } else if (std::holds_alternative<bool>(arg)) {
+                return static_cast<double>(std::get<bool>(arg));
+            } else if (std::holds_alternative<std::string>(arg)) {
+                // Try to parse string as double
+                try {
+                    return std::stod(std::get<std::string>(arg));
+                } catch (...) {
+                    return 0.0;
+                }
+            }
+        } else if (call->methodName == "string") {
+            // Convert to string
+            if (std::holds_alternative<int>(arg)) {
+                return std::to_string(std::get<int>(arg));
+            } else if (std::holds_alternative<float>(arg)) {
+                return std::to_string(std::get<float>(arg));
+            } else if (std::holds_alternative<double>(arg)) {
+                return std::to_string(std::get<double>(arg));
+            } else if (std::holds_alternative<bool>(arg)) {
+                return std::get<bool>(arg) ? "true" : "false";
+            } else if (std::holds_alternative<char>(arg)) {
+                return std::string(1, std::get<char>(arg));
+            } else if (std::holds_alternative<std::string>(arg)) {
+                return arg;
+            }
+        }
     }
     
     // Default return value
@@ -305,7 +452,7 @@ int main(int argc, char* argv[]) {
     Parser parser(lexer);
     
     if (mode == "-g") {
-        // GCC编译模式: generate AST, then compile to executable
+        // GCC compile mode: generate AST, then compile to executable
         std::cout << "Entering GCC compile mode..." << std::endl;
         
         // Generate AST

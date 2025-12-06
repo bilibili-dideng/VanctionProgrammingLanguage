@@ -1,101 +1,139 @@
-# Vanction 编程语言 - 开发文档
+# Vanction Programming Language - Development Documentation
 
-## 1. 项目概述
+## 1. Project Overview
 
-Vanction 是一种简单的编译型编程语言，支持编译为可执行文件（通过 GCC）或直接解释执行。
+Vanction is a simple compiled programming language that supports compiling to executable files (via GCC) or direct interpretation.
 
-## 2. 目录结构
+## 2. Directory Structure
 
 ```
 VanctionProgramLanguage/
-├── include/           # 头文件
-│   ├── ast.h          # AST 节点定义
-│   └── token.h        # 标记类型定义
-├── src/               # 源代码
-│   ├── code_generator.cpp  # C++ 代码生成器
-│   ├── code_generator.h    # 代码生成器头文件
-│   ├── lexer.cpp      # 词法分析器
-│   ├── lexer.h        # 词法分析器头文件
-│   ├── main.cpp       # 主程序入口
-│   ├── parser.cpp     # 语法分析器
-│   └── parser.h       # 语法分析器头文件
-├── examples/          # 示例程序
-│   ├── hello_world.vn # Hello World 示例
-│   └── variable_test.vn # 变量和输入输出示例
-├── build/             # 构建目录
-├── CMakeLists.txt     # CMake 构建配置
-├── DEVELOPMENT.md     # 开发文档
-└── README.md          # 使用文档
+├── include/           # Header files
+│   ├── ast.h          # AST node definitions
+│   └── token.h        # Token type definitions
+├── src/               # Source code
+│   ├── code_generator.cpp  # C++ code generator
+│   ├── code_generator.h    # Code generator header
+│   ├── lexer.cpp      # Lexical analyzer
+│   ├── lexer.h        # Lexical analyzer header
+│   ├── main.cpp       # Main program entry
+│   ├── parser.cpp     # Syntax analyzer
+│   └── parser.h       # Syntax analyzer header
+├── examples/          # Example programs
+│   ├── hello_world.vn # Hello World example
+│   └── variable_test.vn # Variable and I/O example
+├── build/             # Build directory
+├── CMakeLists.txt     # CMake build configuration
+├── DEVELOPMENT.md     # Development documentation
+└── README.md          # User documentation
 ```
 
-## 3. 核心组件
+## 3. Core Components
 
-### 3.1 词法分析器（Lexer）
+### 3.1 Lexical Analyzer (Lexer)
 
-- **功能**：将源代码转换为标记流
-- **实现**：`src/lexer.cpp` 和 `src/lexer.h`
-- **关键方法**：
-  - `getNextToken()`：获取下一个标记
-  - `parseIdentifierOrKeyword()`：解析标识符或关键字
-  - `parseStringLiteral()`：解析字符串字面量
-  - `parseCharLiteral()`：解析字符字面量
-  - `parseIntegerLiteral()`：解析整数字面量
+- **Function**: Converts source code into a token stream
+- **Implementation**: `src/lexer.cpp` and `src/lexer.h`
+- **Key Methods**:
+  - `getNextToken()`: Get the next token
+  - `parseIdentifierOrKeyword()`: Parse identifier or keyword
+  - `parseStringLiteral()`: Parse string literal
+  - `parseCharLiteral()`: Parse character literal
+  - `parseNumberLiteral()`: Parse number literal (integer, float, double)
 
-### 3.2 语法分析器（Parser）
+### 3.2 Syntax Analyzer (Parser)
 
-- **功能**：将标记流转换为抽象语法树（AST）
-- **实现**：`src/parser.cpp` 和 `src/parser.h`
-- **关键方法**：
-  - `parseProgramAST()`：生成整个程序的 AST
-  - `parseFunctionAST()`：解析函数定义
-  - `parseStatement()`：解析语句
-  - `parseExpression()`：解析表达式
-  - `parseVariableDeclaration()`：解析变量声明
+- **Function**: Converts token stream into Abstract Syntax Tree (AST)
+- **Implementation**: `src/parser.cpp` and `src/parser.h`
+- **Key Methods**:
+  - `parseProgramAST()`: Generate AST for the entire program
+  - `parseFunctionAST()`: Parse function definition
+  - `parseStatement()`: Parse statement
+  - `parseExpression()`: Parse expression
+  - `parseVariableDeclaration()`: Parse variable declaration
+  - `parsePrimaryExpression()`: Parse primary expression
+  - `parseStringLiteral()`: Parse string literal
+  - `parseIntegerLiteral()`: Parse integer literal
+  - `parseFloatLiteral()`: Parse float literal
+  - `parseDoubleLiteral()`: Parse double literal
+  - `parseCharLiteral()`: Parse character literal
+  - `parseBooleanLiteral()`: Parse boolean literal
+  - `parseAssignmentExpression()`: Parse assignment expression
+  - `parseBinaryExpression()`: Parse binary expression
+  - `parseMultiplicativeExpression()`: Parse multiplicative expression
+  - `parseAdditiveExpression()`: Parse additive expression
+  - `parseBitShiftExpression()`: Parse bit shift expression
+  - `parseLogicalExpression()`: Parse logical expression
 
-### 3.3 抽象语法树（AST）
+### 3.3 Abstract Syntax Tree (AST)
 
-- **功能**：表示程序的结构化语法
-- **实现**：`include/ast.h`
-- **主要节点类型**：
-  - `Program`：程序根节点
-  - `FunctionDeclaration`：函数声明
-  - `VariableDeclaration`：变量声明
-  - `ExpressionStatement`：表达式语句
-  - `FunctionCall`：函数调用
-  - `BinaryExpression`：二元表达式（如字符串连接）
-  - `AssignmentExpression`：赋值表达式
-  - 各种字面量节点：`IntegerLiteral`, `CharLiteral`, `StringLiteral`, `BooleanLiteral`
+- **Function**: Represents the structured syntax of the program
+- **Implementation**: `include/ast.h`
+- **Main Node Types**:
+  - `Program`: Root node of the program
+  - `FunctionDeclaration`: Function declaration
+  - `VariableDeclaration`: Variable declaration
+  - `ExpressionStatement`: Expression statement
+  - `FunctionCall`: Function call
+  - `BinaryExpression`: Binary expression (supports +, -, *, /, <<, >>, AND, OR, XOR)
+  - `AssignmentExpression`: Assignment expression
+  - Various literal nodes: `IntegerLiteral`, `CharLiteral`, `StringLiteral`, `BooleanLiteral`, `FloatLiteral`, `DoubleLiteral`
 
-### 3.4 代码生成器（CodeGenerator）
+### 3.4 Code Generator (CodeGenerator)
 
-- **功能**：将 AST 转换为 C++ 代码
-- **实现**：`src/code_generator.cpp` 和 `src/code_generator.h`
-- **关键方法**：
-  - `generate()`：生成整个程序的 C++ 代码
-  - `generateFunctionDeclaration()`：生成函数声明的 C++ 代码
-  - `generateVariableDeclaration()`：生成变量声明的 C++ 代码
-  - `generateExpression()`：生成表达式的 C++ 代码
+- **Function**: Converts AST to C++ code
+- **Implementation**: `src/code_generator.cpp` and `src/code_generator.h`
+- **Key Methods**:
+  - `generate()`: Generate C++ code for the entire program
+  - `generateFunctionDeclaration()`: Generate C++ code for function declaration
+  - `generateVariableDeclaration()`: Generate C++ code for variable declaration
+  - `generateExpression()`: Generate C++ code for expression
+  - `generateIdentifier()`: Generate C++ code for identifier
+  - `generateIntegerLiteral()`: Generate C++ code for integer literal
+  - `generateFloatLiteral()`: Generate C++ code for float literal
+  - `generateDoubleLiteral()`: Generate C++ code for double literal
+  - `generateCharLiteral()`: Generate C++ code for character literal
+  - `generateBooleanLiteral()`: Generate C++ code for boolean literal
+  - `generateStringLiteral()`: Generate C++ code for string literal
+  - `generateBinaryExpression()`: Generate C++ code for binary expression
+  - `generateAssignmentExpression()`: Generate C++ code for assignment expression
+  - `generateFunctionCall()`: Generate C++ code for function call
 
-### 3.5 解释器
+### 3.5 Interpreter
 
-- **功能**：直接执行 AST
-- **实现**：`src/main.cpp` 中的执行函数
-- **关键函数**：
-  - `executeProgram()`：执行整个程序
-  - `executeFunctionDeclaration()`：执行函数声明
-  - `executeStatement()`：执行语句
-  - `executeExpression()`：执行表达式
-  - `executeFunctionCall()`：执行函数调用
+- **Function**: Directly execute AST
+- **Implementation**: Execution functions in `src/main.cpp`
+- **Key Functions**:
+  - `executeProgram()`: Execute the entire program
+  - `executeFunctionDeclaration()`: Execute function declaration
+  - `executeStatement()`: Execute statement
+  - `executeExpression()`: Execute expression, supporting multiple operators and data types
+  - `executeFunctionCall()`: Execute function call, including type conversion functions
+  
+- **Supported Data Types**:
+  - int
+  - float
+  - double
+  - char
+  - string
+  - bool
+  - undefined
+  
+- **Supported Operators**:
+  - Arithmetic operators: +, -, *, /
+  - Bitwise operators: <<, >>
+  - Logical operators: AND, OR, XOR
+  - Assignment operator: =
 
-## 4. 编译和构建流程
+## 4. Compilation and Build Process
 
-### 4.1 构建要求
+### 4.1 Build Requirements
 
-- CMake 3.10 或更高版本
-- C++ 编译器支持 C++17
-- GCC 编译器（用于生成可执行文件）
+- CMake 3.10 or higher
+- C++ compiler supporting C++17
+- GCC compiler (for generating executable files)
 
-### 4.2 构建步骤
+### 4.2 Build Steps
 
 ```powershell
 mkdir -p build
@@ -104,71 +142,73 @@ cmake ..
 cmake --build .
 ```
 
-### 4.3 编译流程
+### 4.3 Compilation Process
 
-1. 源代码 → 词法分析器 → 标记流
-2. 标记流 → 语法分析器 → AST
-3. AST → 代码生成器 → C++ 代码
-4. C++ 代码 → GCC → 可执行文件
+1. Source code → Lexical analyzer → Token stream
+2. Token stream → Syntax analyzer → AST
+3. AST → Code generator → C++ code
+4. C++ code → GCC → Executable file
 
-### 4.4 解释流程
+### 4.4 Interpretation Process
 
-1. 源代码 → 词法分析器 → 标记流
-2. 标记流 → 语法分析器 → AST
-3. AST → 解释器 → 直接执行
+1. Source code → Lexical analyzer → Token stream
+2. Token stream → Syntax analyzer → AST
+3. AST → Interpreter → Direct execution
 
-## 5. 扩展指南
+## 5. Extension Guide
 
-### 5.1 添加新数据类型
+### 5.1 Adding New Data Types
 
-1. 在 `include/token.h` 中添加新的标记类型
-2. 在 `src/lexer.cpp` 中添加相应的解析方法
-3. 在 `include/ast.h` 中添加新的字面量节点类型
-4. 在 `src/parser.cpp` 中添加相应的解析方法
-5. 在 `src/main.cpp` 中更新 `executeExpression()` 函数
-6. 在 `src/code_generator.cpp` 中更新 `generateExpression()` 函数
+1. Add new token type in `include/token.h`
+2. Update `parseNumberLiteral()` method in `src/lexer.cpp` to support the new number type
+3. Add new literal node type in `include/ast.h`
+4. Add corresponding parsing method in `src/parser.cpp` (e.g., `parseFloatLiteral()`, `parseDoubleLiteral()`)
+5. Update `Value` type and `executeExpression()` function in `src/main.cpp`
+6. Update `generateExpression()` function and corresponding literal generation methods in `src/code_generator.cpp`
+7. Update `parseStatement()` function in `src/parser.cpp` to support the new data type declaration
 
-### 5.2 添加新语法结构
+### 5.2 Adding New Syntax Structures
 
-1. 在 `include/ast.h` 中添加新的 AST 节点类型
-2. 在 `src/parser.cpp` 中添加相应的解析方法
-3. 在 `src/main.cpp` 中添加相应的执行方法
-4. 在 `src/code_generator.cpp` 中添加相应的代码生成方法
+1. Add new AST node type in `include/ast.h`
+2. Add corresponding parsing method in `src/parser.cpp`
+3. Add corresponding execution method in `src/main.cpp`
+4. Add corresponding code generation method in `src/code_generator.cpp`
 
-### 5.3 添加新的系统函数
+### 5.3 Adding New System Functions
 
-1. 在 `src/parser.cpp` 中确保能正确解析函数调用
-2. 在 `src/main.cpp` 中更新 `executeFunctionCall()` 函数
-3. 在 `src/code_generator.cpp` 中更新 `generateFunctionCall()` 函数
+1. Ensure function calls can be parsed correctly in `src/parser.cpp`
+2. Update `executeFunctionCall()` function in `src/main.cpp`
+3. Update `generateFunctionCall()` function in `src/code_generator.cpp`
 
-## 6. 代码规范
+## 6. Code Standards
 
-- 所有代码注释使用英文
-- 类名使用 PascalCase
-- 函数名和变量名使用 camelCase
-- 常量使用全大写加下划线
-- 每个源文件对应一个头文件
-- 头文件使用 `#ifndef` 防护
+- All code comments should be in English
+- Class names use PascalCase
+- Function names and variable names use camelCase
+- Constants use ALL_CAPS with underscores
+- Each source file corresponds to a header file
+- Header files use `#ifndef` guards
 
-## 7. 调试技巧
+## 7. Debugging Tips
 
-- 使用 `std::cout` 输出中间结果
-- 检查生成的 AST 结构
-- 查看生成的 C++ 代码
-- 使用调试器逐步执行
+- Use `std::cout` to output intermediate results
+- Check the generated AST structure
+- View the generated C++ code
+- Use a debugger to step through execution
 
-## 8. 测试
+## 8. Testing
 
-- 在 `examples/` 目录下添加测试用例
-- 使用两种运行模式（解释器和编译器）测试
-- 测试边界情况和错误情况
+- Add test cases in the `examples/` directory
+- Test using both running modes (interpreter and compiler)
+- Test boundary cases and error conditions
 
-## 9. 未来发展方向
+## 9. Future Development Directions
 
-- 支持更多数据类型（如浮点数）
-- 支持控制流语句（if-else, for, while）
-- 支持自定义函数
-- 支持数组和结构体
-- 支持模块系统
-- 优化错误提示
-- 添加标准库
+- Support control flow statements (if-else, for, while)
+- Support custom functions
+- Support arrays and structures
+- Support module system
+- Optimize error messages
+- Add standard library
+- Support more operators and expressions
+- Support object-oriented programming features

@@ -1,17 +1,17 @@
-# Vanction 编程语言
+# Vanction Programming Language
 
-## 1. 简介
+## 1. Introduction
 
-Vanction 是一种简单的编译型编程语言，支持编译为可执行文件（通过内置 GCC）或直接解释执行。
+Vanction is a simple compiled programming language that supports compiling to executable files (via built-in GCC) or direct interpretation. It has a clean design and intuitive syntax, making it suitable for learning and rapid development of small applications.
 
-## 2. 安装
+## 2. Installation
 
-### 2.1 从源码构建
+### 2.1 Building from Source
 
-1. 确保安装了 CMake 3.10 或更高版本
-2. 确保安装了支持 C++17 的编译器
-3. 克隆或下载项目源码
-4. 执行以下命令构建：
+1. Ensure CMake 3.10 or higher is installed
+2. Ensure a C++ compiler supporting C++17 is installed
+3. Clone or download the project source code
+4. Execute the following commands to build:
 
 ```powershell
 mkdir -p build
@@ -20,17 +20,17 @@ cmake ..
 cmake --build .
 ```
 
-构建完成后，可执行文件 `vanction.exe` 将生成在 `build` 目录中。
+After building, the executable file `vanction.exe` will be generated in the `build` directory.
 
-### 2.2 直接使用
+### 2.2 Direct Usage
 
-如果你已经有了编译好的 `vanction.exe` 文件，直接将其放在项目根目录或添加到系统 PATH 即可使用。
+If you already have a compiled `vanction.exe` file, simply place it in the project root directory or add it to your system PATH to use it.
 
-## 3. 快速入门
+## 3. Quick Start
 
-### 3.1 Hello World 示例
+### 3.1 Hello World Example
 
-创建一个名为 `hello_world.vn` 的文件，内容如下：
+Create a file named `hello_world.vn` with the following content:
 
 ```vanction
 func main() {
@@ -38,219 +38,301 @@ func main() {
 }
 ```
 
-### 3.2 运行程序
+### 3.2 Running the Program
 
-#### 3.2.1 解释器模式
+#### 3.2.1 Interpreter Mode
 
 ```powershell
 vanction.exe -i hello_world.vn
 ```
 
-#### 3.2.2 编译模式
+#### 3.2.2 Compilation Mode
 
 ```powershell
 vanction.exe -g hello_world.vn
 ```
 
-这将生成一个 `hello_world.exe` 文件，然后可以直接运行：
+This will generate a `hello_world.exe` file, which can then be run directly:
 
 ```powershell
 hello_world.exe
 ```
 
-## 4. 语法参考
+## 4. Syntax Reference
 
-### 4.1 基本语法
+### 4.1 Basic Syntax
 
-#### 4.1.1 注释
+#### 4.1.1 Comments
 
 ```vanction
-| 这是单行注释
+| This is a single-line comment
 ```
 
-#### 4.1.2 主函数
+#### 4.1.2 Main Function
 
-所有程序必须包含一个 `main` 函数作为入口点：
+All programs must contain a `main` function as the entry point:
 
 ```vanction
 func main() {
-    | 函数体
+    | Function body
 }
 ```
 
-### 4.2 变量
+### 4.2 Variables
 
-#### 4.2.1 变量声明与初始化
+#### 4.2.1 Variable Declaration and Initialization
 
 ```vanction
-| 带类型的变量声明与初始化
+| Type-specific variable declaration and initialization
 int num = 123;
+float f = 3.14;
+double d = 2.71828;
 char ch = 'a';
 string str = "Hello";
 bool flag = true;
 
-| 自动类型推断
+| Automatic type inference
 auto num = 456;
 auto str = "World";
+auto f = 3.14;
 
-| 仅声明不初始化，声明后默认值为undefined
+| Declaration without initialization, default value is undefined
 define var;
 ```
 
-#### 4.2.2 变量赋值
+#### 4.2.2 Variable Assignment
 
 ```vanction
 num = 789;
 str = "New string";
+f = 6.28;
 ```
 
-### 4.3 数据类型
+### 4.3 Data Types
 
-| 类型 | 描述 | 示例 |
-|------|------|------|
-| int | 整数 | `int num = 123;` |
-| char | 字符 | `char ch = 'a';` |
-| string | 字符串 | `string str = "Hello";` |
-| bool | 布尔值 | `bool flag = true;` |
-| auto | 自动类型推断 | `auto x = 456;` |
-| undefined | 未定义值 | `define var;` |
+| Type | Description | Example |
+|------|-------------|---------|
+| int | Integer | `int num = 123;` |
+| float | Single-precision floating point | `float f = 3.14;` |
+| double | Double-precision floating point | `double d = 2.71828;` |
+| char | Character | `char ch = 'a';` |
+| string | String | `string str = "Hello";` |
+| bool | Boolean | `bool flag = true;` |
+| auto | Automatic type inference | `auto x = 456;` |
+| undefined | Undefined value | `define var;` |
 
-### 4.4 输入输出
+### 4.4 Operators
 
-#### 4.4.1 输出
+#### 4.4.1 Arithmetic Operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| + | Addition/String concatenation | `a + b` |
+| - | Subtraction | `a - b` |
+| * | Multiplication | `a * b` |
+| / | Division | `a / b` |
+
+#### 4.4.2 Bitwise Operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| << | Left shift | `a << 1` |
+| >> | Right shift | `a >> 1` |
+
+#### 4.4.3 Logical Operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| AND | Logical AND | `a AND b` |
+| OR | Logical OR | `a OR b` |
+| XOR | Logical XOR | `a XOR b` |
+
+### 4.5 Type Conversion
+
+Vanction provides type conversion functions for converting between different data types:
 
 ```vanction
-| 输出字符串
+| Convert other types to integer
+int a = type.int(b);
+
+| Convert other types to float
+float f = type.float(b);
+
+| Convert other types to double
+double d = type.double(b);
+
+| Convert other types to string
+string s = type.string(b);
+```
+
+### 4.6 Input/Output
+
+#### 4.6.1 Output
+
+```vanction
+| Output string
 System.print("Hello, Vanction!");
 
-| 输出变量
+| Output variable
 int num = 123;
 System.print(num);
 
-| 字符串连接
+| String concatenation
 string name = "Vanction";
 System.print("Hello, " + name + "!");
 ```
 
-#### 4.4.2 输入
+#### 4.6.2 Input
 
 ```vanction
-| 获取用户输入，带提示信息
-string name = System.input("请输入你的名字：");
-System.print("你好，" + name + "!");
+| Get user input with prompt
+string name = System.input("Please enter your name: ");
+System.print("Hello, " + name + "!");
 
-| 获取用户输入，不带提示信息
+| Get user input without prompt
 string input = System.input("");
 ```
 
-## 5. 命令行选项
+## 5. Command Line Options
 
-| 选项 | 描述 |
-|------|------|
-| `-i <file.vn>` | 解释器模式，直接执行程序 |
-| `-g <file.vn>` | 编译模式，生成可执行文件 |
-| `-o <output.exe>` | 指定编译输出的可执行文件名 |
-| `-h, --help` | 显示帮助信息 |
+| Option | Description |
+|--------|-------------|
+| `-i <file.vn>` | Interpreter mode, execute the program directly |
+| `-g <file.vn>` | Compilation mode, generate executable file |
+| `-o <output.exe>` | Specify output executable filename for compilation |
+| `-h, --help` | Show help information |
 
-### 5.1 示例
+### 5.1 Examples
 
 ```powershell
-// 解释执行
+// Interpret execution
 vanction.exe -i examples/hello_world.vn
 
-// 编译为可执行文件
+// Compile to executable
 vanction.exe -g examples/hello_world.vn
 
-// 编译并指定输出文件名
+// Compile and specify output filename
 vanction.exe -g examples/hello_world.vn -o hello.exe
 ```
 
-## 6. 示例程序
+## 6. Sample Programs
 
-### 6.1 变量和输入输出示例
+### 6.1 Variable and Input/Output Example
 
 ```vanction
 func main() {
-    | 测试变量声明与初始化功能
+    | Test variable declaration and initialization
     
-    | 整数类型
+    | Integer type
     int num1 = 123;
     System.print(num1);
     
-    | 字符类型
+    | Floating point types
+    float f = 3.14;
+    double d = 2.71828;
+    System.print(f);
+    System.print(d);
+    
+    | Character type
     char char1 = 'a';
     System.print(char1);
     
-    | 字符串类型
+    | String type
     string str1 = "Hello, Vanction!";
     System.print(str1);
     
-    | 布尔类型
+    | Boolean type
     bool flag1 = true;
     bool flag2 = false;
     System.print(flag1);
     System.print(flag2);
     
-    | auto类型推断
+    | Automatic type inference
     auto auto1 = 456;
     System.print(auto1);
     
     auto auto2 = "Auto string";
     System.print(auto2);
     
-    | define声明
-    define var1;
+    | Arithmetic operations
+    System.print(10 + 5);
+    System.print(10 - 5);
+    System.print(10 * 5);
+    System.print(10 / 5);
     
-    | 输入功能测试
-    string input1 = System.input("请输入你的名字：");
-    System.print("你好，" + input1 + "!");
+    | Bitwise operations
+    System.print(8 << 1);
+    System.print(8 >> 1);
     
-    | 输入赋值给变量
-    System.print("请输入一个数字：");
-    string inputNum = System.input("");
-    System.print("你输入的数字是：" + inputNum);
+    | Logical operations
+    System.print(flag1 AND flag2);
+    System.print(flag1 OR flag2);
+    System.print(flag1 XOR flag2);
+    
+    | Type conversion
+    int i = 42;
+    float f2 = type.float(i);
+    System.print(f2);
+    
+    | Input function test
+    string input1 = System.input("Please enter your name: ");
+    System.print("Hello, " + input1 + "!");
 }
 ```
 
-## 7. 注意事项
+## 7. Notes
 
-1. 所有语句必须以分号 `;` 结尾
-2. 字符串字面量使用双引号 `""` 包裹
-3. 字符字面量使用单引号 `''` 包裹
-4. 布尔值为 `true` 或 `false`（小写）
-5. 编译模式需要内置的 GCC 支持，确保 `mingw64` 目录与 `vanction.exe` 处于同一目录
-6. 变量名只能包含字母和数字，且不能以数字开头
+1. All statements must end with a semicolon `;`
+2. String literals are enclosed in double quotes `""`
+3. Character literals are enclosed in single quotes `''`
+4. Boolean values are `true` or `false` (lowercase)
+5. Compilation mode requires built-in GCC support, ensure the `mingw64` directory is in the same directory as `vanction.exe`
+6. Variable names can only contain letters and numbers, and cannot start with a number
 
-## 8. 已知限制
+## 8. Known Limitations
 
-1. 目前仅支持基本数据类型
-2. 不支持控制流语句（if-else, for, while）
-3. 不支持自定义函数
-4. 不支持数组和结构体
-5. 仅支持单行注释
-6. 字符串连接仅支持 `+` 操作符
+1. Does not support control flow statements (if-else, for, while)
+2. Does not support custom functions
+3. Does not support arrays and structures
+4. Only supports single-line comments
+5. String operations only support `+` concatenation operator
 
-## 9. 未来计划
+## 9. Future Plans
 
-- 支持更多数据类型（如浮点数）
-- 支持控制流语句
-- 支持自定义函数
-- 支持数组和结构体
-- 支持多行注释
-- 添加更多系统函数
-- 优化错误提示
+- Support control flow statements (if-else, for, while)
+- Support custom functions
+- Support arrays and structures
+- Support multi-line comments
+- Add more system functions
+- Optimize error messages
 
-## 10. 许可证
+## 10. Project Structure
 
-本项目采用 MIT 许可证。
+```
+VanctionProgramLanguage/
+├── .idea/              | IDE configuration files
+├── build/              | Build output directory
+├── doc/                | Documentation directory
+├── examples/           | Example programs
+├── include/            | Header files
+├── mingw64/            | GCC compiler
+├── src/                | Source code
+├── .gitignore          | Git ignore configuration
+├── CMakeLists.txt      | CMake configuration
+└── README.md           | Project documentation
+```
 
-## 11. 贡献
+## 11. License
 
-欢迎提交 Issues 和 Pull Requests！
+This project is licensed under the MIT License.
 
-## 12. 联系方式
+## 12. Contributions
 
-如有问题或建议，请通过以下方式联系：
+Issues and Pull Requests are welcome!
 
-- 项目地址：[VanctionProgramLanguage](https://github.com/yourusername/VanctionProgramLanguage)
-- 邮箱：your.email@example.com
+## 13. Contact
+
+For questions or suggestions, please contact:
+
+- Project Address: [VanctionProgramLanguage](https://github.com/bilibili-dideng/VanctionProgramLanguage)
+- Email: 3483434955@qq.com

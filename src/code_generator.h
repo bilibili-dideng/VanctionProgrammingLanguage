@@ -4,7 +4,7 @@
 #include "../include/ast.h"
 #include <string>
 
-// 代码生成器类
+// Code generator class
 class CodeGenerator {
 public:
     // Generate C++ code
