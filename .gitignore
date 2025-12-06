@@ -5,6 +5,9 @@
 # build
 build/*
 
+# bin
+bin/
+
 # mingw64
 mingw64/*
 
