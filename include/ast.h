@@ -10,14 +10,25 @@ public:
     virtual ~ASTNode() = default;
 };
 
+// Function parameter
+struct FunctionParameter {
+    std::string type; // Optional, defaults to "auto"
+    std::string name;
+    
+    FunctionParameter(const std::string& name, const std::string& type = "auto")
+        : type(type), name(name) {}
+};
+
 // Function declaration node
 class FunctionDeclaration : public ASTNode {
 public:
+    std::string returnType;
     std::string name;
+    std::vector<FunctionParameter> parameters;
     std::vector<ASTNode*> body;
     
-    FunctionDeclaration(const std::string& name)
-        : name(name) {}
+    FunctionDeclaration(const std::string& returnType, const std::string& name)
+        : returnType(returnType), name(name) {}
     
     ~FunctionDeclaration() {
         for (auto node : body) {
@@ -186,6 +197,21 @@ public:
         : expression(expression) {}
     
     ~ExpressionStatement() {
+        if (expression) {
+            delete expression;
+        }
+    }
+};
+
+// Return statement
+class ReturnStatement : public Statement {
+public:
+    Expression* expression;
+    
+    ReturnStatement(Expression* expression = nullptr)
+        : expression(expression) {}
+    
+    ~ReturnStatement() {
         if (expression) {
             delete expression;
         }

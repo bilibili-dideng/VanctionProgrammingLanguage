@@ -27,7 +27,29 @@ std::string CodeGenerator::generateFunctionDeclaration(FunctionDeclaration* func
     if (func->name == "main") {
         code += "int main() {\n";
     } else {
-        code += "void " + func->name + "() {\n";
+        // Generate return type
+        std::string returnType = func->returnType;
+        if (returnType == "string") {
+            returnType = "std::string";
+        }
+        
+        // Generate function name
+        code += returnType + " " + func->name + "(";
+        
+        // Generate parameters
+        for (size_t i = 0; i < func->parameters.size(); ++i) {
+            const auto& param = func->parameters[i];
+            std::string paramType = param.type;
+            if (paramType == "string") {
+                paramType = "std::string";
+            }
+            code += paramType + " " + param.name;
+            if (i < func->parameters.size() - 1) {
+                code += ", ";
+            }
+        }
+        
+        code += ") {\n";
     }
     
     // Generate function body
@@ -50,15 +72,21 @@ std::string CodeGenerator::generateFunctionDeclaration(FunctionDeclaration* func
             code += generateDoWhileLoopStatement(doWhileStmt);
         } else if (auto switchStmt = dynamic_cast<SwitchStatement*>(stmt)) {
             code += generateSwitchStatement(switchStmt);
+        } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
+            code += "    return";
+            if (returnStmt->expression) {
+                code += " " + generateExpression(returnStmt->expression);
+            }
+            code += ";\n";
+        } else if (auto nestedFunc = dynamic_cast<FunctionDeclaration*>(stmt)) {
+            // Generate nested function declaration
+            code += "    " + generateFunctionDeclaration(nestedFunc);
         } else {
             code += "    // Unimplemented statement type\n";
         }
     }
     
     // Generate function end
-    if (func->name == "main") {
-        code += "    return 0;\n";
-    }
     code += "}\n\n";
     
     return code;
@@ -445,6 +473,20 @@ std::string CodeGenerator::generateFunctionCall(FunctionCall* call) {
         } else if (call->methodName == "string") {
             return "std::to_string(" + arg + ")";
         }
+    } else if (call->objectName.empty()) {
+        // Regular function call (e.g., myFunction())
+        std::string code = call->methodName + "(";
+        
+        // Generate arguments
+        for (size_t i = 0; i < call->arguments.size(); ++i) {
+            code += generateExpression(call->arguments[i]);
+            if (i < call->arguments.size() - 1) {
+                code += ", ";
+            }
+        }
+        
+        code += ")";
+        return code;
     }
     return "// Unimplemented function call";
 }

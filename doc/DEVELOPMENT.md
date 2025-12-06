@@ -49,6 +49,7 @@ Vanction is a simple compiled programming language that supports compiling to ex
   - `parseWhileLoopStatement()`: Parse while loop
   - `parseDoWhileLoopStatement()`: Parse do-while loop
   - `parseSwitchStatement()`: Parse switch statement
+  - `parseReturnStatement()`: Parse return statement
 
 ### 3.3 Abstract Syntax Tree (AST)
 
@@ -70,6 +71,7 @@ Vanction is a simple compiled programming language that supports compiling to ex
   - `SwitchStatement`: switch statement
   - `CaseStatement`: case label in switch statement
   - `Comment`: Comment node
+  - `ReturnStatement`: return statement
   - Various literal nodes: `IntegerLiteral`, `CharLiteral`, `StringLiteral`, `BooleanLiteral`, `FloatLiteral`, `DoubleLiteral`
 
 ### 3.4 Code Generator (CodeGenerator)
@@ -98,6 +100,7 @@ Vanction is a simple compiled programming language that supports compiling to ex
   - `generateWhileLoopStatement()`: Generate C++ code for while loop
   - `generateDoWhileLoopStatement()`: Generate C++ code for do-while loop
   - `generateSwitchStatement()`: Generate C++ code for switch statement
+  - `generateReturnStatement()`: Generate C++ code for return statement
 
 ### 3.5 Interpreter
 
@@ -106,7 +109,7 @@ Vanction is a simple compiled programming language that supports compiling to ex
 - **Key Functions**:
   - `executeProgram()`: Execute the entire program
   - `executeFunctionDeclaration()`: Execute function declaration
-  - `executeStatement()`: Execute statement
+  - `executeStatement()`: Execute statement, including return statements
   - `executeExpression()`: Execute expression, supporting multiple operators and data types
   - `executeFunctionCall()`: Execute function call, including type conversion functions
   
@@ -134,7 +137,16 @@ Vanction is a simple compiled programming language that supports compiling to ex
 - C++ compiler supporting C++17
 - GCC compiler (for generating executable files)
 
-### 4.2 Build Steps
+### 4.2 Command Line Parameters
+
+- `-i`: Interpret the Vanction program
+- `-g`: Compile to executable file (using GCC)
+- `-o <file>`: Specify output filename for compilation
+- `-debug`: Enable debug logging from lexer, parser, and code generator
+- `-config <key> [set <value>|get|reset]`: Configure program settings (e.g., -config GCC set <path>)
+- `-h, --help`: Show help message
+
+### 4.3 Build Steps
 
 ```powershell
 mkdir -p build
@@ -143,14 +155,14 @@ cmake ..
 cmake --build .
 ```
 
-### 4.3 Compilation Process
+### 4.4 Compilation Process
 
 1. Source code → Lexical analyzer → Token stream
 2. Token stream → Syntax analyzer → AST
 3. AST → Code generator → C++ code
 4. C++ code → GCC → Executable file
 
-### 4.4 Interpretation Process
+### 4.5 Interpretation Process
 
 1. Source code → Lexical analyzer → Token stream
 2. Token stream → Syntax analyzer → AST
@@ -205,10 +217,17 @@ cmake --build .
 
 ## 9. Future Development Directions
 
-- Support custom functions
 - Support arrays and structures
 - Support module system
-- Optimize error messages
 - Add standard library
 - Support more operators and expressions
 - Support object-oriented programming features
+
+## 10. Recently Implemented Features
+
+- **Return Statement Support**: Added support for `return` statements with optional expressions
+- **Custom Functions**: Implemented support for defining and calling custom functions
+- **Nested Functions**: Added support for defining functions within other functions
+- **Improved Error Handling**: Enhanced error messages with more accurate error types and contexts
+- **Debug Mode**: Added `-debug` parameter to enable detailed logging from lexer, parser, and code generator
+- **Auto Return Type**: Functions can now be defined without explicit return types (default to `auto`)

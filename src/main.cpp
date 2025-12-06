@@ -10,6 +10,13 @@
 #include <variant>
 #include <any>
 #include <stdexcept>
+#include <windows.h>
+
+// Forward declaration for getExecutableDir function
+std::string getExecutableDir();
+
+// Global configuration declaration
+extern std::map<std::string, std::string> config;
 
 // Read file content
 std::string readFile(const std::string& filePath) {
@@ -40,11 +47,77 @@ void writeFile(const std::string& filePath, const std::string& content) {
 
 // Call external compiler
 int compileWithGCC(const std::string& cppFile, const std::string& outputFile) {
-    std::string command = ".\\mingw64\\bin\\g++.exe " + cppFile + " -o " + outputFile;
+    std::string gccPath = config["GCC"];
+    
+    // If GCC path is AUTO_GCC, use path relative to executable or project root
+    if (gccPath == "AUTO_GCC") {
+        // Try from project root (assuming executable is in build directory)
+        std::string execDir = getExecutableDir();
+        std::string projectRoot;
+        
+        // Find build directory in path and get parent directory as project root
+        size_t buildPos = execDir.find("\\build");
+        if (buildPos != std::string::npos) {
+            projectRoot = execDir.substr(0, buildPos);
+        } else {
+            // If not in build directory, use current directory
+            projectRoot = execDir;
+        }
+        
+        gccPath = projectRoot + "\\mingw64\\bin\\g++.exe";
+    }
+    
+    std::string command = gccPath + " " + cppFile + " -o " + outputFile;
     std::cout << "Executing command: " << command << std::endl;
     
     return system(command.c_str());
 }
+
+// Get executable directory path
+std::string getExecutableDir() {
+    char buffer[1024];
+    GetModuleFileNameA(NULL, buffer, sizeof(buffer));
+    std::string path(buffer);
+    size_t lastSlash = path.find_last_of('\\');
+    if (lastSlash == std::string::npos) {
+        lastSlash = path.find_last_of('/');
+    }
+    return lastSlash != std::string::npos ? path.substr(0, lastSlash) : "";
+}
+
+// Get AppData directory for configuration storage
+std::string getAppDataDir() {
+    const char* appDataEnv = getenv("APPDATA");
+    if (!appDataEnv) {
+        // Fallback to executable directory if APPDATA not found
+        return getExecutableDir();
+    }
+    return std::string(appDataEnv);
+}
+
+// Create directory if it doesn't exist
+void createDirectoryIfNotExists(const std::string& dirPath) {
+    // Windows-compatible implementation
+    std::string command = "mkdir \"" + dirPath + "\" 2>nul || echo Directory already exists";
+    system(command.c_str());
+}
+
+// Get configuration directory path
+std::string getConfigDir() {
+    std::string configDir = getAppDataDir() + "\\VanctionLang";
+    createDirectoryIfNotExists(configDir);
+    return configDir;
+}
+
+// Get configuration file path
+std::string getConfigFilePath() {
+    return getConfigDir() + "\\config.json";
+}
+
+// Global configuration definition
+std::map<std::string, std::string> config = {
+    {"GCC", "AUTO_GCC"}  // Special value to indicate using GCC relative to executable
+};
 
 // Get filename without extension
 std::string getFileNameWithoutExt(const std::string& filePath) {
@@ -60,6 +133,9 @@ using Value = std::variant<int, char, std::string, bool, float, double, std::mon
 
 // Global variable environment
 std::map<std::string, Value> variables;
+
+// Global function environment
+std::map<std::string, FunctionDeclaration*> functions;
 
 // Forward declarations for execute functions
 void executeFunctionDeclaration(FunctionDeclaration* func);
@@ -79,6 +155,9 @@ void executeProgram(Program* program) {
 
 // Execute function declaration
 void executeFunctionDeclaration(FunctionDeclaration* func) {
+    // Store function in global function environment
+    functions[func->name] = func;
+    
     // Only execute main function in interpret mode
     if (func->name == "main") {
         // Execute function body
@@ -106,6 +185,17 @@ void executeStatement(ASTNode* stmt) {
             // Store default value (monostate for undefined)
             variables[varDecl->name] = std::monostate{};
         }
+    } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
+        // Execute return expression if it exists
+        if (returnStmt->expression) {
+            executeExpression(returnStmt->expression);
+        }
+        // For now, we'll just return from the statement execution
+        // In the future, we'll need to handle function return values properly
+        return;
+    } else if (auto funcDecl = dynamic_cast<FunctionDeclaration*>(stmt)) {
+        // Execute nested function declaration
+        executeFunctionDeclaration(funcDecl);
     }
 }
 
@@ -367,13 +457,168 @@ Value executeFunctionCall(FunctionCall* call) {
                 return arg;
             }
         }
+    } else if (call->objectName.empty()) {
+        // Regular function call
+        std::string funcName = call->methodName;
+        
+        // Check if function exists
+        if (functions.find(funcName) == functions.end()) {
+            throw std::runtime_error("Undefined function: " + funcName);
+        }
+        
+        FunctionDeclaration* func = functions[funcName];
+        
+        // Save current variable environment
+        auto savedVariables = variables;
+        
+        // Handle function arguments
+        if (call->arguments.size() != func->parameters.size()) {
+            throw std::runtime_error("Function " + funcName + " expects " + std::to_string(func->parameters.size()) + " arguments, but got " + std::to_string(call->arguments.size()));
+        }
+        
+        // Assign argument values to parameters
+        for (size_t i = 0; i < call->arguments.size(); ++i) {
+            Value argValue = executeExpression(call->arguments[i]);
+            variables[func->parameters[i].name] = argValue;
+        }
+        
+        // Execute function body
+        for (auto stmt : func->body) {
+            executeStatement(stmt);
+        }
+        
+        // Restore saved variable environment
+        variables = savedVariables;
     }
     
     // Default return value
     return std::monostate{};
 }
 
+// Load configuration from JSON file
+void loadConfig() {
+    std::ifstream configFile(getConfigFilePath());
+    if (!configFile.is_open()) {
+        // Config file doesn't exist, use defaults
+        return;
+    }
+    
+    // Read entire file
+    std::string content((std::istreambuf_iterator<char>(configFile)),
+                        std::istreambuf_iterator<char>());
+    configFile.close();
+    
+    // Simple JSON parsing for key-value pairs
+    size_t start = content.find('{');
+    size_t end = content.find_last_of('}');
+    if (start == std::string::npos || end == std::string::npos || start >= end) {
+        return;
+    }
+    
+    std::string jsonContent = content.substr(start + 1, end - start - 1);
+    
+    // Parse key-value pairs
+    size_t pos = 0;
+    while (pos < jsonContent.length()) {
+        // Skip whitespace
+        while (pos < jsonContent.length() && (jsonContent[pos] == ' ' || jsonContent[pos] == '\n' || jsonContent[pos] == '\t' || jsonContent[pos] == '\r')) {
+            pos++;
+        }
+        if (pos >= jsonContent.length()) break;
+        
+        // Find key
+        size_t keyStart = pos;
+        while (pos < jsonContent.length() && jsonContent[pos] != '"') pos++;
+        if (pos >= jsonContent.length() || jsonContent[pos] != '"') continue;
+        keyStart = pos + 1;
+        pos++;
+        
+        while (pos < jsonContent.length() && jsonContent[pos] != '"') pos++;
+        if (pos >= jsonContent.length() || jsonContent[pos] != '"') continue;
+        std::string key = jsonContent.substr(keyStart, pos - keyStart);
+        pos++;
+        
+        // Find colon
+        while (pos < jsonContent.length() && (jsonContent[pos] == ' ' || jsonContent[pos] == '\n' || jsonContent[pos] == '\t' || jsonContent[pos] == '\r' || jsonContent[pos] == ',')) {
+            pos++;
+        }
+        if (pos >= jsonContent.length() || jsonContent[pos] != ':') continue;
+        pos++;
+        
+        // Find value
+        while (pos < jsonContent.length() && (jsonContent[pos] == ' ' || jsonContent[pos] == '\n' || jsonContent[pos] == '\t' || jsonContent[pos] == '\r')) {
+            pos++;
+        }
+        if (pos >= jsonContent.length()) continue;
+        
+        size_t valueStart = pos;
+        if (jsonContent[pos] == '"') {
+            valueStart = pos + 1;
+            pos++;
+            while (pos < jsonContent.length() && jsonContent[pos] != '"') pos++;
+            if (pos >= jsonContent.length() || jsonContent[pos] != '"') continue;
+        } else {
+            while (pos < jsonContent.length() && (jsonContent[pos] != ',' && jsonContent[pos] != ' ' && jsonContent[pos] != '\n' && jsonContent[pos] != '\t' && jsonContent[pos] != '\r')) {
+                pos++;
+            }
+        }
+        std::string value = jsonContent.substr(valueStart, pos - valueStart);
+        
+        // Store in config
+        config[key] = value;
+    }
+}
+
+// Save configuration to JSON file
+void saveConfig() {
+    std::ofstream configFile(getConfigFilePath());
+    if (!configFile.is_open()) {
+        std::cerr << "Error: Cannot write to configuration file " << getConfigFilePath() << std::endl;
+        return;
+    }
+    
+    // Write JSON header
+    configFile << "{" << std::endl;
+    
+    // Write key-value pairs
+    bool first = true;
+    for (const auto& [key, value] : config) {
+        if (!first) {
+            configFile << "," << std::endl;
+        }
+        first = false;
+        configFile << "    \"" << key << "\": \"" << value << "\"";
+    }
+    
+    // Write JSON footer
+    configFile << std::endl << "}" << std::endl;
+    
+    configFile.close();
+}
+
+// Debug flag
+bool debugMode = false;
+
+// Print help message
+void printHelp(std::ostream& os) {
+    os << "Usage: vanction <RunMod> [options] <file.vn>" << std::endl;
+    os << "       vanction -config <key> [set <value>|get|reset]" << std::endl;
+    os << "<RunMod> must be either -i or -g" << std::endl;
+    os << "Options: " << std::endl;
+    os << "  -i         Interpret the Vanction program" << std::endl;
+    os << "  -g         Compile to executable file (using GCC)" << std::endl;
+    os << "  -o <file>  Specify output filename for compilation" << std::endl;
+    os << "  -debug     Enable debug logging for lexer, parser, main, and codegenerator" << std::endl;
+    os << "  -config    Configure program settings (e.g., -config GCC set <path>, -config GCC get, or -config GCC reset)" << std::endl;
+    os << "  -h, --help Show this help message" << std::endl;
+    os << "Configurable settings: " << std::endl;
+    os << "  GCC        Path to GCC compiler executable" << std::endl;
+}
+
 int main(int argc, char* argv[]) {
+    // Load configuration
+    loadConfig();
+    
     // Command line arguments handling
     std::string filePath;
     std::string outputFile;
@@ -392,26 +637,77 @@ int main(int argc, char* argv[]) {
                 std::cerr << "Error: -o option requires an output filename" << std::endl;
                 return 1;
             }
+        } else if (arg == "-debug") {
+            debugMode = true;
         } else if (arg == "-h" || arg == "--help") {
-            std::cout << "Usage: vanction <RunMod> [options] <file.vn>" << std::endl;
-            std::cout << "<RunMod> must be either -i or -g" << std::endl;
-            std::cout << "Options: " << std::endl;
-            std::cout << "  -i         Interpret the Vanction program" << std::endl;
-            std::cout << "  -g         Compile to executable file (using GCC)" << std::endl;
-            std::cout << "  -o <file>  Specify output filename for compilation" << std::endl;
-            std::cout << "  -h, --help Show this help message" << std::endl;
+            printHelp(std::cout);
             return 0;
+        } else if (arg == "-config") {
+            // Handle configuration commands
+            if (i + 1 < argc) {
+                std::string configKey = argv[++i];
+                
+                if (i + 1 < argc) {
+                    std::string action = argv[++i];
+                    
+                    if (action == "set") {
+                        if (i + 1 < argc) {
+                            std::string configValue = argv[++i];
+                            config[configKey] = configValue;
+                            saveConfig();
+                            std::cout << "Config " << configKey << " set to: " << configValue << std::endl;
+                            return 0;
+                        } else {
+                            std::cerr << "Error: -config set requires a value" << std::endl;
+                            return 1;
+                        }
+                    } else if (action == "get") {
+                        // Get configuration value
+                        if (config.find(configKey) != config.end()) {
+                            std::cout << config[configKey] << std::endl;
+                        } else {
+                            std::cerr << "Error: Config key not found: " << configKey << std::endl;
+                            return 1;
+                        }
+                        return 0;
+                    } else if (action == "reset") {
+                        // Reset configuration value to default
+                        if (configKey == "GCC") {
+                            // Reset to special value AUTO_GCC which means using GCC relative to executable
+                            std::string defaultValue = "AUTO_GCC";
+                            config[configKey] = defaultValue;
+                            saveConfig();
+                            std::cout << "Config " << configKey << " reset to default: " << defaultValue << std::endl;
+                        } else {
+                            std::cerr << "Error: Config key cannot be reset: " << configKey << std::endl;
+                            return 1;
+                        }
+                        return 0;
+                    } else {
+                        std::cerr << "Error: Unknown config action: " << action << std::endl;
+                        std::cerr << "Usage: vanction -config <key> [set <value>|get|reset]" << std::endl;
+                        return 1;
+                    }
+                } else {
+                    // Default action: get
+                    if (config.find(configKey) != config.end()) {
+                        std::cout << config[configKey] << std::endl;
+                    } else {
+                        std::cerr << "Error: Config key not found: " << configKey << std::endl;
+                        return 1;
+                    }
+                    return 0;
+                }
+            } else {
+                std::cerr << "Error: -config requires a key" << std::endl;
+                std::cerr << "Usage: vanction -config <key> [set <value>|get|reset]" << std::endl;
+                return 1;
+            }
         } else if (arg.substr(0, 1) != "-") {
             filePath = arg;
         } else {
             std::cerr << "Error: Unknown option " << arg << std::endl;
-            std::cerr << "Usage: vanction <RunMod> [options] <file.vn>" << std::endl;
-            std::cerr << "<RunMod> must be either -i or -g" << std::endl;
-            std::cerr << "Options: " << std::endl;
-            std::cerr << "  -i         Interpret the Vanction program" << std::endl;
-            std::cerr << "  -g         Compile to executable file (using GCC)" << std::endl;
-            std::cerr << "  -o <file>  Specify output filename for compilation" << std::endl;
-            std::cerr << "  -h, --help Show this help message" << std::endl;
+            printHelp(std::cerr);
             return 1;
         }
     }
@@ -419,26 +715,14 @@ int main(int argc, char* argv[]) {
     // Check if mode is specified
     if (mode.empty()) {
         std::cerr << "Error: Mode must be specified (-i or -g)" << std::endl;
-        std::cerr << "Usage: vanction <RunMod> [options] <file.vn>" << std::endl;
-        std::cerr << "<RunMod> must be either -i or -g" << std::endl;
-        std::cerr << "Options: " << std::endl;
-        std::cerr << "  -i         Interpret the Vanction program" << std::endl;
-        std::cerr << "  -g         Compile to executable file (using GCC)" << std::endl;
-        std::cerr << "  -o <file>  Specify output filename for compilation" << std::endl;
-        std::cerr << "  -h, --help Show this help message" << std::endl;
+        printHelp(std::cerr);
         return 1;
     }
     
     // Check if file is specified
     if (filePath.empty()) {
         std::cerr << "Error: Input file must be specified" << std::endl;
-        std::cerr << "Usage: vanction <RunMod> [options] <file.vn>" << std::endl;
-        std::cerr << "<RunMod> must be either -i or -g" << std::endl;
-        std::cerr << "Options: " << std::endl;
-        std::cerr << "  -i         Interpret the Vanction program" << std::endl;
-        std::cerr << "  -g         Compile to executable file (using GCC)" << std::endl;
-        std::cerr << "  -o <file>  Specify output filename for compilation" << std::endl;
-        std::cerr << "  -h, --help Show this help message" << std::endl;
+        printHelp(std::cerr);
         return 1;
     }
     
@@ -452,23 +736,44 @@ int main(int argc, char* argv[]) {
         // Read file content
         std::string sourceCode = readFile(filePath);
         
+        if (debugMode) {
+            std::cout << "[DEBUG] Main: Read file content successfully" << std::endl;
+        }
+        
         // Create error reporter
         ErrorReporter errorReporter(sourceCode, filePath);
         
         // Create lexer
         Lexer lexer(sourceCode);
+        lexer.setDebug(debugMode);
+        
+        if (debugMode) {
+            std::cout << "[DEBUG] Main: Created lexer and set debug mode" << std::endl;
+        }
         
         // Create parser
         Parser parser(lexer);
+        
+        if (debugMode) {
+            std::cout << "[DEBUG] Main: Created parser" << std::endl;
+        }
         
         if (mode == "-g") {
             // GCC compile mode: generate AST, then compile to executable
             std::cout << "Entering GCC compile mode..." << std::endl;
             
+            if (debugMode) {
+                std::cout << "[DEBUG] Main: Entering GCC compile mode" << std::endl;
+            }
+            
             // Generate AST
             auto program = parser.parseProgramAST();
             if (!program) {
                 throw std::runtime_error("AST generation failed");
+            }
+            
+            if (debugMode) {
+                std::cout << "[DEBUG] Main: Generated AST successfully" << std::endl;
             }
             
             // Check if main function exists
@@ -492,6 +797,10 @@ int main(int argc, char* argv[]) {
             // Generate C++ code
             CodeGenerator codeGen;
             std::string cppCode = codeGen.generate(program);
+            
+            if (debugMode) {
+                std::cout << "[DEBUG] Main: Generated C++ code successfully" << std::endl;
+            }
             
             // Save generated C++ code
             std::string cppFile = getFileNameWithoutExt(filePath) + ".cpp";
@@ -526,10 +835,18 @@ int main(int argc, char* argv[]) {
         } else if (mode == "-i") {
             // Interpret mode: generate AST and execute
             
+            if (debugMode) {
+                std::cout << "[DEBUG] Main: Entering interpret mode" << std::endl;
+            }
+            
             // Generate AST
             auto program = parser.parseProgramAST();
             if (!program) {
                 throw std::runtime_error("AST generation failed");
+            }
+            
+            if (debugMode) {
+                std::cout << "[DEBUG] Main: Generated AST successfully" << std::endl;
             }
             
             // Check if main function exists
@@ -553,6 +870,10 @@ int main(int argc, char* argv[]) {
             // Execute the program
             executeProgram(program);
             
+            if (debugMode) {
+                std::cout << "[DEBUG] Main: Program execution completed" << std::endl;
+            }
+            
             // Clean up AST
             delete program;
         }
@@ -565,9 +886,13 @@ int main(int argc, char* argv[]) {
         std::string errorMsg = e.what();
         ErrorType errorType = ErrorType::CError;
         
-        if (errorMsg.find("Syntax error") != std::string::npos) {
+        if (errorMsg.find("Syntax error") != std::string::npos ||
+            errorMsg.find("Function definition") != std::string::npos ||
+            errorMsg.find("Function name") != std::string::npos) {
             errorType = ErrorType::SyntaxError;
-        } else if (errorMsg.find("Unknown character") != std::string::npos) {
+        } else if (errorMsg.find("Unknown character") != std::string::npos ||
+                   errorMsg.find("Unexpected token") != std::string::npos ||
+                   errorMsg.find("expected ") != std::string::npos) {
             errorType = ErrorType::TokenError;
         } else if (errorMsg.find("Division by zero") != std::string::npos) {
             errorType = ErrorType::DivideByZeroError;
@@ -576,7 +901,7 @@ int main(int argc, char* argv[]) {
         } else if (errorMsg.find("Main function") != std::string::npos) {
             errorType = ErrorType::MainFunctionError;
         }
-        
+
         // Create and report error
         Error error(errorType, errorMsg, filePath, 1, 1);
         errorReporter.report(error);

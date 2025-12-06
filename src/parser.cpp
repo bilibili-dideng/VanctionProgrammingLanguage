@@ -28,10 +28,17 @@ bool Parser::parseProgram() {
 Program* Parser::parseProgramAST() {
     auto program = new Program();
     
-    // Parse function definition
-    auto func = parseFunctionAST();
-    if (func) {
-        program->declarations.push_back(func);
+    // Parse all function definitions until end of file
+    while (currentToken.type != EOF_TOKEN) {
+        if (currentToken.type == KEYWORD && currentToken.value == "func") {
+            auto func = parseFunctionAST();
+            if (func) {
+                program->declarations.push_back(func);
+            }
+        } else {
+            // If it's not a function declaration, skip this token and continue
+            currentToken = lexer->getNextToken();
+        }
     }
     
     return program;
@@ -88,15 +95,34 @@ FunctionDeclaration* Parser::parseFunctionAST() {
     }
     consume(KEYWORD);
     
-    // Parse function name
-    if (currentToken.type != IDENTIFIER) {
-        throw std::runtime_error("Syntax error: Function name must be an identifier");
-    }
+    // Parse function name - no return type, no parameter types
+    std::string returnType = "auto"; // Default return type is auto
     std::string funcName = currentToken.value;
-    consume(IDENTIFIER);
+    consume(currentToken.type);
     
     // Parse left parenthesis
     consume(LPAREN);
+    
+    // Parse parameters
+    std::vector<FunctionParameter> parameters;
+    if (currentToken.type != RPAREN) {
+        // Parse first parameter - only parameter name, no type
+        std::string paramName = currentToken.value;
+        consume(IDENTIFIER);
+        
+        parameters.emplace_back(paramName);
+        
+        // Parse additional parameters
+        while (currentToken.type == IDENTIFIER && currentToken.value == ",") {
+            consume(IDENTIFIER); // Consume comma
+            
+            // Parse parameter name - only parameter name, no type
+            std::string paramName = currentToken.value;
+            consume(IDENTIFIER);
+            
+            parameters.emplace_back(paramName);
+        }
+    }
     
     // Parse right parenthesis
     consume(RPAREN);
@@ -111,7 +137,8 @@ FunctionDeclaration* Parser::parseFunctionAST() {
     consume(RBRACE);
     
     // Create function declaration node
-    auto func = new FunctionDeclaration(funcName);
+    auto func = new FunctionDeclaration(returnType, funcName);
+    func->parameters = std::move(parameters);
     func->body = std::move(body);
     
     return func;
@@ -137,6 +164,12 @@ std::vector<ASTNode*> Parser::parseFunctionBodyAST() {
             
             // Move to next token
             currentToken = lexer->getNextToken();
+        } else if (currentToken.type == KEYWORD && currentToken.value == "func") {
+            // Parse nested function declaration
+            auto func = parseFunctionAST();
+            if (func) {
+                body.push_back(func);
+            }
         } else {
             // Parse statement
             auto stmt = parseStatement();
@@ -558,6 +591,24 @@ Statement* Parser::parseStatement() {
         return parseSwitchStatement();
     }
     
+    // Check for return statement
+    if (currentToken.type == KEYWORD && currentToken.value == "return") {
+        // Consume 'return' keyword
+        consume(KEYWORD);
+        
+        // Parse optional expression
+        Expression* expr = nullptr;
+        if (currentToken.type != SEMICOLON) {
+            expr = parseExpression();
+        }
+        
+        // Expect semicolon
+        consume(SEMICOLON);
+        
+        // Create return statement
+        return new ReturnStatement(expr);
+    }
+    
     // Parse expression
     auto expr = parseExpression();
     if (!expr) {
@@ -774,7 +825,7 @@ Expression* Parser::parsePrimaryExpression() {
         std::string name = currentToken.value;
         currentToken = lexer->getNextToken();
         
-        // Check if it's a function call (e.g., System.print)
+        // Check if it's a method call (e.g., System.print)
         if (currentToken.type == DOT) {
             // It's a method call, parse it as function call
             currentToken = lexer->getNextToken(); // consume dot
@@ -814,7 +865,41 @@ Expression* Parser::parsePrimaryExpression() {
             consume(RPAREN);
             
             return call;
-        } else {
+        } 
+        // Check if it's a regular function call (e.g., myFunction())
+        else if (currentToken.type == LPAREN) {
+            // It's a regular function call
+            consume(LPAREN);
+            
+            // Create function call node (use empty object name for regular function calls)
+            auto call = new FunctionCall("", name);
+            
+            // Parse arguments
+            if (currentToken.type != RPAREN) {
+                auto arg = parseExpression();
+                if (arg) {
+                    call->arguments.push_back(arg);
+                }
+                
+                // Parse additional arguments separated by commas
+                while (currentToken.type == IDENTIFIER && currentToken.value == ",") {
+                    // Consume comma
+                    currentToken = lexer->getNextToken();
+                    
+                    // Parse next argument
+                    arg = parseExpression();
+                    if (arg) {
+                        call->arguments.push_back(arg);
+                    }
+                }
+            }
+            
+            // Expect right parenthesis
+            consume(RPAREN);
+            
+            return call;
+        } 
+        else {
             // It's a simple identifier
             return new Identifier(name);
         }

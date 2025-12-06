@@ -1,6 +1,7 @@
 #include "lexer.h"
 #include <cctype>
 #include <stdexcept>
+#include <iostream>
 
 // Constructor
 Lexer::Lexer(const std::string& source) {
@@ -22,19 +23,34 @@ Token Lexer::getNextToken() {
         token.value = "";
         token.line = line;
         token.column = column;
+        if (debugMode) {
+            std::cout << "[DEBUG] Lexer: EOF_TOKEN at line " << token.line << ", column " << token.column << std::endl;
+        }
         return token;
     }
     
     char current = source[pos];
     
+    if (debugMode) {
+        std::cout << "[DEBUG] Lexer: Processing character '" << current << "' at line " << line << ", column " << column << std::endl;
+    }
+    
     // Check for comment
     if (current == '|') {
-        return parseComment();
+        Token token = parseComment();
+        if (debugMode) {
+            std::cout << "[DEBUG] Lexer: COMMENT token: " << token.value << " at line " << token.line << ", column " << token.column << std::endl;
+        }
+        return token;
     }
     
     // Check for string literal
     if (current == '"') {
-        return parseStringLiteral();
+        Token token = parseStringLiteral();
+        if (debugMode) {
+            std::cout << "[DEBUG] Lexer: STRING_LITERAL token: \"" << token.value << "\" at line " << token.line << ", column " << token.column << std::endl;
+        }
+        return token;
     }
     
     // Check for parentheses
@@ -45,6 +61,9 @@ Token Lexer::getNextToken() {
         token.value = "(";
         token.line = line;
         token.column = column - 1;
+        if (debugMode) {
+            std::cout << "[DEBUG] Lexer: LPAREN token at line " << token.line << ", column " << token.column << std::endl;
+        }
         return token;
     }
     
@@ -56,6 +75,9 @@ Token Lexer::getNextToken() {
         token.value = "+";
         token.line = line;
         token.column = column - 1;
+        if (debugMode) {
+            std::cout << "[DEBUG] Lexer: PLUS token at line " << token.line << ", column " << token.column << std::endl;
+        }
         return token;
     }
     if (current == '-') {
@@ -281,7 +303,7 @@ Token Lexer::parseIdentifierOrKeyword() {
     int start_line = line;
     int start_column = column;
     
-    while (pos < source.length() && (isalnum(source[pos]) || source[pos] == '-')) {
+    while (pos < source.length() && (isalnum(source[pos]) || source[pos] == '-' || source[pos] == '_')) {
         advance();
     }
     
@@ -297,12 +319,18 @@ Token Lexer::parseIdentifierOrKeyword() {
         value == "float" || value == "double" || value == "AND" || value == "OR" || value == "XOR" ||
         // Control flow keywords
         value == "if" || value == "else" || value == "else-if" || value == "for" || value == "while" || value == "do" ||
-        value == "switch" || value == "case" || value == "in") {
+        value == "switch" || value == "case" || value == "in" || value == "return") {
         token.type = KEYWORD;
         token.value = value;
+        if (debugMode) {
+            std::cout << "[DEBUG] Lexer: KEYWORD token: " << token.value << " at line " << token.line << ", column " << token.column << std::endl;
+        }
     } else {
         token.type = IDENTIFIER;
         token.value = value;
+        if (debugMode) {
+            std::cout << "[DEBUG] Lexer: IDENTIFIER token: " << token.value << " at line " << token.line << ", column " << token.column << std::endl;
+        }
     }
     
     return token;

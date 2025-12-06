@@ -362,6 +362,8 @@ DivideByZeroError: Division by zero
 | `-i <file.vn>` | Interpreter mode, execute the program directly |
 | `-g <file.vn>` | Compilation mode, generate executable file |
 | `-o <output.exe>` | Specify output executable filename for compilation |
+| `-debug` | Enable debug logging for lexer, parser, main, and codegenerator |
+| `-config <key> [set <value>|get|reset]` | Configure program settings (e.g., -config GCC set <path>) |
 | `-h, --help` | Show help information |
 
 ### 6.1 Examples
@@ -375,6 +377,15 @@ vanction.exe -g examples/hello_world.vn
 
 // Compile and specify output filename
 vanction.exe -g examples/hello_world.vn -o hello.exe
+
+// Get GCC path configuration
+vanction.exe -config GCC get
+
+// Set GCC path configuration
+vanction.exe -config GCC set "path/to/g++.exe"
+
+// Reset GCC path to default
+vanction.exe -config GCC reset
 ```
 
 ## 7. Sample Programs

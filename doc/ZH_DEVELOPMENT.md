@@ -49,6 +49,7 @@ Vanction 是一种简单的编译型编程语言，支持编译为可执行文�
   - `parseWhileLoopStatement()`：解析 while 循环
   - `parseDoWhileLoopStatement()`：解析 do-while 循环
   - `parseSwitchStatement()`：解析 switch 语句
+  - `parseReturnStatement()`：解析 return 语句
 
 ### 3.3 抽象语法树（AST）
 
@@ -70,6 +71,7 @@ Vanction 是一种简单的编译型编程语言，支持编译为可执行文�
   - `SwitchStatement`：switch 语句
   - `CaseStatement`：switch 语句中的 case 标签
   - `Comment`：注释节点
+  - `ReturnStatement`：return 语句
   - 各种字面量节点：`IntegerLiteral`, `CharLiteral`, `StringLiteral`, `BooleanLiteral`, `FloatLiteral`, `DoubleLiteral`
 
 ### 3.4 代码生成器（CodeGenerator）
@@ -98,6 +100,7 @@ Vanction 是一种简单的编译型编程语言，支持编译为可执行文�
   - `generateWhileLoopStatement()`：生成 while 循环的 C++ 代码
   - `generateDoWhileLoopStatement()`：生成 do-while 循环的 C++ 代码
   - `generateSwitchStatement()`：生成 switch 语句的 C++ 代码
+  - `generateReturnStatement()`：生成 return 语句的 C++ 代码
 
 ### 3.5 解释器
 
@@ -106,7 +109,7 @@ Vanction 是一种简单的编译型编程语言，支持编译为可执行文�
 - **关键函数**：
   - `executeProgram()`：执行整个程序
   - `executeFunctionDeclaration()`：执行函数声明
-  - `executeStatement()`：执行语句
+  - `executeStatement()`：执行语句，包括return语句
   - `executeExpression()`：执行表达式，支持多种运算符和数据类型
   - `executeFunctionCall()`：执行函数调用，包括类型转换函数
   
@@ -134,7 +137,16 @@ Vanction 是一种简单的编译型编程语言，支持编译为可执行文�
 - C++ 编译器支持 C++17
 - GCC 编译器（用于生成可执行文件）
 
-### 4.2 构建步骤
+### 4.2 命令行参数
+
+- `-i`: 解释执行 Vanction 程序
+- `-g`: 编译为可执行文件（使用 GCC）
+- `-o <file>`: 指定编译输出文件名
+- `-debug`: 启用词法分析器、语法分析器和代码生成器的详细日志
+- `-config <key> [set <value>|get|reset]`: 配置程序设置（例如：-config GCC set <path>）
+- `-h, --help`: 显示帮助信息
+
+### 4.3 构建步骤
 
 ```powershell
 mkdir -p build
@@ -143,14 +155,14 @@ cmake ..
 cmake --build .
 ```
 
-### 4.3 编译流程
+### 4.4 编译流程
 
 1. 源代码 → 词法分析器 → 标记流
 2. 标记流 → 语法分析器 → AST
 3. AST → 代码生成器 → C++ 代码
 4. C++ 代码 → GCC → 可执行文件
 
-### 4.4 解释流程
+### 4.5 解释流程
 
 1. 源代码 → 词法分析器 → 标记流
 2. 标记流 → 语法分析器 → AST
@@ -205,10 +217,17 @@ cmake --build .
 
 ## 9. 未来发展方向
 
-- 支持自定义函数
 - 支持数组和结构体
 - 支持模块系统
-- 优化错误提示
 - 添加标准库
 - 支持更多运算符和表达式
 - 支持面向对象编程特性
+
+## 10. 最近实现的功能
+
+- **Return语句支持**：添加了带可选表达式的`return`语句支持
+- **自定义函数**：实现了定义和调用自定义函数的支持
+- **嵌套函数**：添加了在其他函数内部定义函数的支持
+- **改进的错误处理**：增强了错误消息，包含更准确的错误类型和上下文
+- **调试模式**：添加了`-debug`参数，启用来自词法分析器、语法分析器和代码生成器的详细日志
+- **自动返回类型**：现在可以定义没有显式返回类型的函数（默认为`auto`）

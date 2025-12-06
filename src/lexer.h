@@ -13,11 +13,15 @@ public:
     // Get next token
     Token getNextToken();
     
+    // Set debug mode
+    void setDebug(bool debug) { debugMode = debug; }
+    
 private:
     std::string source;
     size_t pos;
     int line;
     int column;
+    bool debugMode = false;
     
     // Advance one character
     void advance();

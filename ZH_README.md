@@ -362,6 +362,8 @@ DivideByZeroError: Division by zero
 | `-i <file.vn>` | 解释器模式，直接执行程序 |
 | `-g <file.vn>` | 编译模式，生成可执行文件 |
 | `-o <output.exe>` | 指定编译输出的可执行文件名 |
+| `-debug` | 启用词法分析器、解析器、主程序和代码生成器的调试日志 |
+| `-config <key> [set <value>|get|reset]` | 配置程序设置（例如：-config GCC set <path>） |
 | `-h, --help` | 显示帮助信息 |
 
 ### 6.1 示例
@@ -375,6 +377,15 @@ vanction.exe -g examples/hello_world.vn
 
 // 编译并指定输出文件名
 vanction.exe -g examples/hello_world.vn -o hello.exe
+
+// 获取 GCC 路径配置
+vanction.exe -config GCC get
+
+// 设置 GCC 路径配置
+vanction.exe -config GCC set "path/to/g++.exe"
+
+// 重置 GCC 路径为默认值
+vanction.exe -config GCC reset
 ```
 
 ## 7. 示例程序
