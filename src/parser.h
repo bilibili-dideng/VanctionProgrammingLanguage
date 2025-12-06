@@ -34,6 +34,9 @@ private:
     // Parse namespace declaration and generate AST
     NamespaceDeclaration* parseNamespaceDeclarationAST();
     
+    // Parse class declaration and generate AST
+    ClassDeclaration* parseClassDeclarationAST();
+    
     // Parse function body
     void parseFunctionBody();
     

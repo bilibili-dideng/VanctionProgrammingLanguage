@@ -72,6 +72,13 @@ Vanction 是一种简单的编译型编程语言，支持编译为可执行文�
   - `CaseStatement`：switch 语句中的 case 标签
   - `Comment`：注释节点
   - `ReturnStatement`：return 语句
+  - `NamespaceDeclaration`：命名空间声明
+  - `NamespaceAccess`：命名空间访问表达式
+  - `ClassDeclaration`：类声明
+  - `ClassMethodDeclaration`：类方法声明
+  - `InstanceMethodDeclaration`：实例方法声明
+  - `InstanceCreationExpression`：实例创建表达式
+  - `InstanceAccessExpression`：实例访问表达式
   - 各种字面量节点：`IntegerLiteral`, `CharLiteral`, `StringLiteral`, `BooleanLiteral`, `FloatLiteral`, `DoubleLiteral`
 
 ### 3.4 代码生成器（CodeGenerator）
@@ -221,7 +228,6 @@ cmake --build .
 - 支持模块系统
 - 添加标准库
 - 支持更多运算符和表达式
-- 支持面向对象编程特性
 
 ## 10. 最近实现的功能
 
@@ -232,3 +238,13 @@ cmake --build .
 - **调试模式**：添加了`-debug`参数，启用来自词法分析器、语法分析器和代码生成器的详细日志
 - **自动返回类型**：现在可以定义没有显式返回类型的函数（默认为`auto`）
 - **退出码支持**：main函数的返回值现在在解释器模式下作为程序退出码正确处理
+- **命名空间**：添加了命名空间支持，用于组织代码并避免命名冲突
+- **面向对象编程 (OOP)**：添加了全面的OOP支持，包括：
+  - 带继承的类定义
+  - 实例创建和初始化
+  - 实例方法和类方法
+  - 实例变量访问和修改
+  - 方法重写
+  - 支持`init`构造函数方法
+  - 支持`class.method()`语法用于类方法调用
+  - 支持`instance.method()`语法用于实例方法调用

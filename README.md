@@ -387,6 +387,164 @@ func main() {
 }
 ```
 
+### 4.9 Object-Oriented Programming (OOP)
+
+Vanction supports basic object-oriented programming features, including class definitions, inheritance, instance methods, class methods, and instance variables.
+
+#### 4.9.1 Class Definition
+
+```vanction
+| Class declaration syntax
+class ClassName(BaseClassName) {
+    | Instance initialization method
+    instance.init(instance, parameters) {
+        | Initialize instance variables
+        instance.variable = value;
+    }
+    
+    | Instance method
+    instance.methodName(instance, parameters) {
+        | Method body
+        return result;
+    }
+    
+    | Class method
+    class.methodName() {
+        | Method body
+        return result;
+    }
+}
+
+| Example: Base class Person
+class Person() {
+    instance.init(instance, name, age) {
+        instance.name = name;
+        instance.age = age;
+    }
+    
+    instance.getName(instance) {
+        return instance.name;
+    }
+    
+    instance.getAge(instance) {
+        return instance.age;
+    }
+    
+    class.greet() {
+        System.print("Hello from Person class!");
+    }
+}
+```
+
+#### 4.9.2 Class Inheritance
+
+```vanction
+| Derived class declaration syntax
+class DerivedClassName(BaseClassName) {
+    | Override init method
+    instance.init(instance, parameters) {
+        | Call parent class init method
+        BaseClassName.init(instance, parentParameters);
+        | Initialize additional instance variables
+        instance.derivedVariable = value;
+    }
+    
+    | Override instance method
+    instance.methodName(instance, parameters) {
+        | Method body
+        return result;
+    }
+}
+
+| Example: Derived class Student inherits from Person
+class Student(Person) {
+    instance.init(instance, name, age, studentId) {
+        | Call parent constructor
+        Person.init(instance, name, age);
+        instance.studentId = studentId;
+    }
+    
+    instance.getStudentId(instance) {
+        return instance.studentId;
+    }
+    
+    | Override parent method
+    instance.getName(instance) {
+        return "Student: " + instance.name;
+    }
+}
+```
+
+#### 4.9.3 Instance Creation
+
+```vanction
+| Create instance syntax
+variable = instance ClassName(arguments);
+
+| Example
+func main() {
+    | Create Person instance
+    person1 = instance Person("Alice", 30);
+    
+    | Create Student instance
+    student1 = instance Student("Bob", 20, "S12345");
+}
+```
+
+#### 4.9.4 Instance Method Call
+
+```vanction
+| Instance method call syntax
+result = instanceName.methodName(arguments);
+
+| Example
+func main() {
+    person1 = instance Person("Alice", 30);
+    
+    | Call instance methods
+    string name = person1.getName();
+    int age = person1.getAge();
+    
+    System.print("Name: " + name);
+    System.print("Age: " + age);
+}
+```
+
+#### 4.9.5 Class Method Call
+
+```vanction
+| Class method call syntax
+class.methodName();
+
+| Example
+func main() {
+    | Call class method
+    class.greet();
+}
+```
+
+#### 4.9.6 Instance Variable Access
+
+```vanction
+| Access instance variable
+value = instanceName.variableName;
+
+| Modify instance variable
+instanceName.variableName = newValue;
+
+| Example
+func main() {
+    person1 = instance Person("Alice", 30);
+    
+    | Access instance variable
+    System.print("Current age: " + person1.getAge());
+    
+    | Modify instance variable
+    person1.age = 31;
+    System.print("Updated age: " + person1.getAge());
+}
+```
+
 ## 5. Error Handling
 
 Vanction has a comprehensive error handling system that provides clear and formatted error messages. When an error occurs, the interpreter/compiler will display:

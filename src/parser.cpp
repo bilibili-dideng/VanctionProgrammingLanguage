@@ -36,8 +36,32 @@ bool Parser::parseProgram() {
                 }
                 currentToken = lexer->getNextToken();
             }
+        } else if (currentToken.type == KEYWORD && currentToken.value == "class") {
+            // Skip class declaration
+            consume(KEYWORD);
+            consume(IDENTIFIER);
+            consume(LPAREN);
+            
+            // Skip base class if exists
+            if (currentToken.type == IDENTIFIER) {
+                consume(IDENTIFIER);
+            }
+            
+            consume(RPAREN);
+            consume(LBRACE);
+            
+            // Skip all content until matching right brace
+            int braceCount = 1;
+            while (currentToken.type != EOF_TOKEN && braceCount > 0) {
+                if (currentToken.type == LBRACE) {
+                    braceCount++;
+                } else if (currentToken.type == RBRACE) {
+                    braceCount--;
+                }
+                currentToken = lexer->getNextToken();
+            }
         } else {
-            // If it's not a function or namespace declaration, skip this token and continue
+            // If it's not a function, namespace, or class declaration, skip this token and continue
             currentToken = lexer->getNextToken();
         }
     }
@@ -72,8 +96,13 @@ NamespaceDeclaration* Parser::parseNamespaceDeclarationAST() {
             if (nestedNs) {
                 ns->declarations.push_back(nestedNs);
             }
+        } else if (currentToken.type == KEYWORD && currentToken.value == "class") {
+            auto cls = parseClassDeclarationAST();
+            if (cls) {
+                ns->declarations.push_back(cls);
+            }
         } else {
-            // If it's not a function or namespace declaration, skip this token and continue
+            // If it's not a function, namespace, or class declaration, skip this token and continue
             currentToken = lexer->getNextToken();
         }
     }
@@ -82,6 +111,181 @@ NamespaceDeclaration* Parser::parseNamespaceDeclarationAST() {
     consume(RBRACE);
     
     return ns;
+}
+
+// Parse class declaration and generate AST
+ClassDeclaration* Parser::parseClassDeclarationAST() {
+    // Consume 'class' keyword
+    consume(KEYWORD);
+    
+    // Parse class name
+    std::string name = currentToken.value;
+    consume(IDENTIFIER);
+    
+    // Parse left parenthesis for inheritance
+    consume(LPAREN);
+    
+    // Parse base class (optional)
+    std::string baseClassName = "";
+    if (currentToken.type == IDENTIFIER) {
+        baseClassName = currentToken.value;
+        consume(IDENTIFIER);
+    }
+    
+    // Parse right parenthesis
+    consume(RPAREN);
+    
+    // Parse left brace
+    consume(LBRACE);
+    
+    // Create class declaration node
+    auto cls = new ClassDeclaration(name, baseClassName);
+    
+    // Parse declarations inside class until right brace
+    while (currentToken.type != RBRACE && currentToken.type != EOF_TOKEN) {
+        // Parse init method or instance method
+        if (currentToken.type == KEYWORD && currentToken.value == "instance") {
+            consume(KEYWORD); // Consume instance
+            
+            if (currentToken.type == DOT) {
+                consume(DOT); // Consume dot
+                
+                if (currentToken.type == KEYWORD && currentToken.value == "init") {
+                    consume(KEYWORD); // Consume init
+                    
+                    // Parse method parameters
+                    consume(LPAREN);
+                    
+                    // Create init method declaration
+                    auto initMethod = new InstanceMethodDeclaration(name, "init", "void");
+                    
+                    // Parse parameters (first parameter is instance)
+                    if ((currentToken.type == IDENTIFIER || currentToken.type == KEYWORD) && currentToken.value == "instance") {
+                        consume(currentToken.type);
+                        // Skip instance parameter
+            if (currentToken.type == COMMA) {
+                consume(COMMA);
+            }
+                    }
+                    
+                    // Parse additional parameters
+                    while (currentToken.type == IDENTIFIER) {
+                        std::string paramName = currentToken.value;
+                        consume(IDENTIFIER);
+                        initMethod->parameters.push_back(FunctionParameter(paramName));
+                        
+                        if (currentToken.type == COMMA) {
+                            consume(COMMA);
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    // Parse right parenthesis
+                    consume(RPAREN);
+                    
+                    // Parse method body
+                    consume(LBRACE);
+                    initMethod->body = parseFunctionBodyAST();
+                    consume(RBRACE);
+                    
+                    cls->initMethod = initMethod;
+                } else {
+                    // It's an instance method, not init
+                    std::string methodName = currentToken.value;
+                    consume(IDENTIFIER);
+                    
+                    // Parse method parameters
+                    consume(LPAREN);
+                    
+                    // Create instance method declaration
+                    auto method = new InstanceMethodDeclaration(name, methodName, "void");
+                    
+                    // Parse parameters (first parameter is instance)
+                    if ((currentToken.type == IDENTIFIER || currentToken.type == KEYWORD) && currentToken.value == "instance") {
+                        consume(currentToken.type);
+                        // Skip instance parameter
+            if (currentToken.type == COMMA) {
+                consume(COMMA);
+            }
+                    }
+                    
+                    // Parse additional parameters
+                    while (currentToken.type == IDENTIFIER) {
+                        std::string paramName = currentToken.value;
+                        consume(IDENTIFIER);
+                        method->parameters.push_back(FunctionParameter(paramName));
+                        
+                        if (currentToken.type == COMMA) {
+                            consume(COMMA);
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    // Parse right parenthesis
+                    consume(RPAREN);
+                    
+                    // Parse method body
+                    consume(LBRACE);
+                    method->body = parseFunctionBodyAST();
+                    consume(RBRACE);
+                    
+                    cls->instanceMethods.push_back(method);
+                }
+            }
+        }
+        // Parse class method
+        else if (currentToken.type == KEYWORD && currentToken.value == "class") {
+            // Consume class keyword
+            consume(KEYWORD);
+            // Consume dot
+            consume(DOT);
+            
+            // Parse method name
+            std::string methodName = currentToken.value;
+            consume(IDENTIFIER);
+            
+            // Parse method parameters
+            consume(LPAREN);
+            
+            // Create class method declaration
+            auto method = new ClassMethodDeclaration(name, methodName, "void");
+            
+            // Parse parameters
+                    while (currentToken.type == IDENTIFIER) {
+                        std::string paramName = currentToken.value;
+                        consume(IDENTIFIER);
+                        method->parameters.push_back(FunctionParameter(paramName));
+                        
+                        if (currentToken.type == COMMA) {
+                            consume(COMMA);
+                        } else {
+                            break;
+                        }
+                    }
+            
+            // Parse right parenthesis
+            consume(RPAREN);
+            
+            // Parse method body
+            consume(LBRACE);
+            method->body = parseFunctionBodyAST();
+            consume(RBRACE);
+            
+            cls->methods.push_back(method);
+        }
+
+        // Skip other tokens
+        else {
+            currentToken = lexer->getNextToken();
+        }
+    }
+    
+    // Parse right brace
+    consume(RBRACE);
+    
+    return cls;
 }
 
 // Parse program and generate AST
@@ -100,8 +304,13 @@ Program* Parser::parseProgramAST() {
             if (ns) {
                 program->declarations.push_back(ns);
             }
+        } else if (currentToken.type == KEYWORD && currentToken.value == "class") {
+            auto cls = parseClassDeclarationAST();
+            if (cls) {
+                program->declarations.push_back(cls);
+            }
         } else {
-            // If it's not a function or namespace declaration, skip this token and continue
+            // If it's not a function, namespace, or class declaration, skip this token and continue
             currentToken = lexer->getNextToken();
         }
     }
@@ -178,15 +387,15 @@ FunctionDeclaration* Parser::parseFunctionAST() {
         parameters.emplace_back(paramName);
         
         // Parse additional parameters
-        while (currentToken.type == IDENTIFIER && currentToken.value == ",") {
-            consume(IDENTIFIER); // Consume comma
-            
-            // Parse parameter name - only parameter name, no type
-            std::string paramName = currentToken.value;
-            consume(IDENTIFIER);
-            
-            parameters.emplace_back(paramName);
-        }
+            while (currentToken.type == COMMA) {
+                consume(COMMA); // Consume comma
+                
+                // Parse parameter name - only parameter name, no type
+                std::string paramName = currentToken.value;
+                consume(IDENTIFIER);
+                
+                parameters.emplace_back(paramName);
+            }
     }
     
     // Parse right parenthesis
@@ -742,12 +951,8 @@ Expression* Parser::parseAssignmentExpression() {
         consume(ASSIGN);
         auto right = parseAssignmentExpression();
         
-        // Check if left is an identifier
-        if (auto ident = dynamic_cast<Identifier*>(left)) {
-            return new AssignmentExpression(ident, right);
-        } else {
-            throw std::runtime_error("left side of assignment must be an identifier");
-        }
+        // Allow any expression on the left side, not just identifiers
+        return new AssignmentExpression(left, right);
     }
     
     return left;
@@ -885,8 +1090,160 @@ Expression* Parser::parseBinaryExpression() {
 
 // Parse primary expression
 Expression* Parser::parsePrimaryExpression() {
-    // Check for identifier
-    if (currentToken.type == IDENTIFIER) {
+    // Check for class method call (e.g., class.method())
+    if (currentToken.type == KEYWORD && currentToken.value == "class") {
+        // Create an Identifier object for "class"
+        auto ident = new Identifier("class");
+        
+        // Consume the "class" keyword
+        currentToken = lexer->getNextToken();
+        
+        // Check if it's a class method call (e.g., class.method())
+        if (currentToken.type == DOT) {
+            // Consume dot
+            currentToken = lexer->getNextToken();
+            
+            // Parse method name
+            std::string methodName = currentToken.value;
+            currentToken = lexer->getNextToken();
+            
+            // It should be a method call
+            if (currentToken.type != LPAREN) {
+                throw std::runtime_error("Expected left parenthesis after class method name");
+            }
+            
+            // Consume left parenthesis
+            consume(LPAREN);
+            
+            // Create function call node
+            auto call = new FunctionCall("class", methodName);
+            
+            // Parse arguments
+            if (currentToken.type != RPAREN) {
+                auto arg = parseExpression();
+                if (arg) {
+                    call->arguments.push_back(arg);
+                }
+                
+                // Parse additional arguments separated by commas
+                while (currentToken.type == COMMA) {
+                    // Consume comma
+                    consume(COMMA);
+                    
+                    // Parse next argument
+                    arg = parseExpression();
+                    if (arg) {
+                        call->arguments.push_back(arg);
+                    }
+                }
+            }
+            
+            // Expect right parenthesis
+            consume(RPAREN);
+            
+            return call;
+        }
+        // Otherwise, it's just a regular identifier "class"
+        return ident;
+    }
+    
+    // Check for instance creation or instance access (e.g., instance ClassName() or instance.member)
+    if (currentToken.type == KEYWORD && currentToken.value == "instance") {
+        // Create an Identifier object for "instance"
+        auto ident = new Identifier("instance");
+        
+        // Consume the "instance" keyword
+        currentToken = lexer->getNextToken();
+        
+        // Check if it's an instance creation expression (e.g., instance ClassName())
+        if (currentToken.type == IDENTIFIER) {
+            // It's an instance creation expression
+            std::string className = currentToken.value;
+            consume(IDENTIFIER);
+            
+            // Parse arguments
+            consume(LPAREN);
+            
+            // Create instance creation expression
+            auto instanceExpr = new InstanceCreationExpression(className);
+            
+            // Parse arguments
+            if (currentToken.type != RPAREN) {
+                auto arg = parseExpression();
+                if (arg) {
+                    instanceExpr->arguments.push_back(arg);
+                }
+                
+                // Parse additional arguments separated by commas
+                while (currentToken.type == COMMA) {
+                    // Consume comma
+                    consume(COMMA);
+                    
+                    // Parse next argument
+                    arg = parseExpression();
+                    if (arg) {
+                        instanceExpr->arguments.push_back(arg);
+                    }
+                }
+            }
+            
+            // Expect right parenthesis
+            consume(RPAREN);
+            
+            return instanceExpr;
+        }
+        // Check if it's an instance access expression (e.g., instance.member)
+        else if (currentToken.type == DOT) {
+            // Consume dot
+            currentToken = lexer->getNextToken();
+            
+            // Parse member name
+            std::string memberName = currentToken.value;
+            currentToken = lexer->getNextToken();
+            
+            // Check if it's a method call (e.g., instance.method())
+            if (currentToken.type == LPAREN) {
+                // Consume left parenthesis
+                consume(LPAREN);
+                
+                // Create function call node
+                auto call = new FunctionCall("instance", memberName);
+                
+                // Parse arguments
+                if (currentToken.type != RPAREN) {
+                    auto arg = parseExpression();
+                    if (arg) {
+                        call->arguments.push_back(arg);
+                    }
+                    
+                    // Parse additional arguments separated by commas
+                    while (currentToken.type == COMMA) {
+                        // Consume comma
+                        consume(COMMA);
+                        
+                        // Parse next argument
+                        arg = parseExpression();
+                        if (arg) {
+                            call->arguments.push_back(arg);
+                        }
+                    }
+                }
+                
+                // Expect right parenthesis
+                consume(RPAREN);
+                
+                return call;
+            } else {
+                // It's a simple instance member access
+                return new InstanceAccessExpression(ident, memberName);
+            }
+        }
+        // Otherwise, it's just a regular identifier "instance"
+        return ident;
+    }
+    
+    // Check for identifier or instance keyword
+    if (currentToken.type == IDENTIFIER || (currentToken.type == KEYWORD && currentToken.value == "instance")) {
         std::string name = currentToken.value;
         currentToken = lexer->getNextToken();
         
@@ -915,9 +1272,9 @@ Expression* Parser::parsePrimaryExpression() {
                     }
                     
                     // Parse additional arguments separated by commas
-                    while (currentToken.type == IDENTIFIER && currentToken.value == ",") {
+                    while (currentToken.type == COMMA) {
                         // Consume comma
-                        currentToken = lexer->getNextToken();
+                        consume(COMMA);
                         
                         // Parse next argument
                         arg = parseExpression();
@@ -936,47 +1293,52 @@ Expression* Parser::parsePrimaryExpression() {
                 return new NamespaceAccess(name, memberName);
             }
         }
-        // Check if it's a method call (e.g., System.print)
+        // Check if it's an instance access (e.g., obj.member or obj.method())
         else if (currentToken.type == DOT) {
-            // It's a method call, parse it as function call
-            currentToken = lexer->getNextToken(); // consume dot
-            
-            // Set up for function call parsing
-            // We need to reconstruct the function call parsing since we already consumed the object name
-            std::string methodName = currentToken.value;
+            // Consume dot
             currentToken = lexer->getNextToken();
             
-            // Expect left parenthesis
-            consume(LPAREN);
+            // Parse member name
+            std::string memberName = currentToken.value;
+            currentToken = lexer->getNextToken();
             
-            // Create function call node
-            auto call = new FunctionCall(name, methodName);
-            
-            // Parse arguments
-            if (currentToken.type != RPAREN) {
-                auto arg = parseExpression();
-                if (arg) {
-                    call->arguments.push_back(arg);
-                }
+            // Check if it's a method call (e.g., obj.method())
+            if (currentToken.type == LPAREN) {
+                // Consume left parenthesis
+                consume(LPAREN);
                 
-                // Parse additional arguments separated by commas
-                while (currentToken.type == IDENTIFIER && currentToken.value == ",") {
-                    // Consume comma
-                    currentToken = lexer->getNextToken();
-                    
-                    // Parse next argument
-                    arg = parseExpression();
+                // Create function call node
+                auto call = new FunctionCall(name, memberName);
+                
+                // Parse arguments
+                if (currentToken.type != RPAREN) {
+                    auto arg = parseExpression();
                     if (arg) {
                         call->arguments.push_back(arg);
                     }
+                    
+                    // Parse additional arguments separated by commas
+                    while (currentToken.type == COMMA) {
+                        // Consume comma
+                        consume(COMMA);
+                        
+                        // Parse next argument
+                        arg = parseExpression();
+                        if (arg) {
+                            call->arguments.push_back(arg);
+                        }
+                    }
                 }
+                
+                // Expect right parenthesis
+                consume(RPAREN);
+                
+                return call;
+            } else {
+                // It's a simple instance member access
+                return new InstanceAccessExpression(new Identifier(name), memberName);
             }
-            
-            // Expect right parenthesis
-            consume(RPAREN);
-            
-            return call;
-        } 
+        }
         // Check if it's a regular function call (e.g., myFunction())
         else if (currentToken.type == LPAREN) {
             // It's a regular function call
@@ -993,9 +1355,9 @@ Expression* Parser::parsePrimaryExpression() {
                 }
                 
                 // Parse additional arguments separated by commas
-                while (currentToken.type == IDENTIFIER && currentToken.value == ",") {
+                while (currentToken.type == COMMA) {
                     // Consume comma
-                    currentToken = lexer->getNextToken();
+                    consume(COMMA);
                     
                     // Parse next argument
                     arg = parseExpression();
@@ -1135,9 +1497,9 @@ Expression* Parser::parseFunctionCall() {
         }
         
         // Parse additional arguments separated by commas
-        while (currentToken.type == IDENTIFIER && currentToken.value == ",") {
+        while (currentToken.type == COMMA) {
             // Consume comma
-            consume(IDENTIFIER);
+            consume(COMMA);
             
             // Parse next argument
             arg = parseExpression();

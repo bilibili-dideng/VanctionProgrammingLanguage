@@ -176,10 +176,10 @@ public:
 // Assignment expression
 class AssignmentExpression : public Expression {
 public:
-    Identifier* left;
+    Expression* left;
     Expression* right;
     
-    AssignmentExpression(Identifier* left, Expression* right)
+    AssignmentExpression(Expression* left, Expression* right)
         : left(left), right(right) {}
     
     ~AssignmentExpression() {
@@ -374,6 +374,79 @@ public:
     
     NamespaceAccess(const std::string& namespaceName, const std::string& memberName)
         : namespaceName(namespaceName), memberName(memberName) {}
+};
+
+// Class declaration node
+class ClassDeclaration : public ASTNode {
+public:
+    std::string name;
+    std::string baseClassName;
+    std::vector<ASTNode*> methods;
+    std::vector<ASTNode*> instanceMethods;
+    ASTNode* initMethod;
+    
+    ClassDeclaration(const std::string& name, const std::string& baseClassName = "")
+        : name(name), baseClassName(baseClassName), initMethod(nullptr) {}
+    
+    ~ClassDeclaration() {
+        for (auto method : methods) {
+            delete method;
+        }
+        for (auto method : instanceMethods) {
+            delete method;
+        }
+        if (initMethod) {
+            delete initMethod;
+        }
+    }
+};
+
+// Class method declaration node
+class ClassMethodDeclaration : public FunctionDeclaration {
+public:
+    std::string className;
+    
+    ClassMethodDeclaration(const std::string& className, const std::string& name, const std::string& returnType = "void")
+        : FunctionDeclaration(returnType, name), className(className) {}
+};
+
+// Instance method declaration node
+class InstanceMethodDeclaration : public FunctionDeclaration {
+public:
+    std::string className;
+    
+    InstanceMethodDeclaration(const std::string& className, const std::string& name, const std::string& returnType = "void")
+        : FunctionDeclaration(returnType, name), className(className) {}
+};
+
+// Instance creation expression
+class InstanceCreationExpression : public Expression {
+public:
+    std::string className;
+    std::vector<Expression*> arguments;
+    
+    InstanceCreationExpression(const std::string& className)
+        : className(className) {}
+    
+    ~InstanceCreationExpression() {
+        for (auto arg : arguments) {
+            delete arg;
+        }
+    }
+};
+
+// Instance access expression
+class InstanceAccessExpression : public Expression {
+public:
+    Expression* instance;
+    std::string memberName;
+    
+    InstanceAccessExpression(Expression* instance, const std::string& memberName)
+        : instance(instance), memberName(memberName) {}
+    
+    ~InstanceAccessExpression() {
+        delete instance;
+    }
 };
 
 // Program node

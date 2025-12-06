@@ -128,23 +128,71 @@ std::string getFileNameWithoutExt(const std::string& filePath) {
     return filePath.substr(0, dotPos);
 }
 
-// Type for variable values
-using Value = std::variant<int, char, std::string, bool, float, double, std::monostate>;
+// Type for variable values - extended to include Instance* for objects
+// Forward declaration for Instance type
+class Instance;
+using Value = std::variant<int, char, std::string, bool, float, double, std::monostate, Instance*>;
 
-// Global variable environment
+// Class definition structure
+struct ClassDefinition {
+    std::string name;
+    std::string baseClassName;
+    std::vector<InstanceMethodDeclaration*> instanceMethods;
+    std::vector<ClassMethodDeclaration*> classMethods;
+    InstanceMethodDeclaration* initMethod;
+};
+
+// Instance structure
+class Instance {
+public:
+    Instance(ClassDefinition* cls) : cls(cls) {}
+    
+    ClassDefinition* cls;
+    std::map<std::string, Value> instanceVariables;
+};
+
+// Global environments
 std::map<std::string, Value> variables;
-
-// Global function environment
 std::map<std::string, FunctionDeclaration*> functions;
+std::map<std::string, std::map<std::string, FunctionDeclaration*>> namespaces;
+std::map<std::string, ClassDefinition*> classes; // Store class definitions
 
 // Forward declarations for execute functions
 Value executeFunctionDeclaration(FunctionDeclaration* func);
 Value executeStatement(ASTNode* stmt, bool* shouldReturn = nullptr);
 Value executeExpression(Expression* expr);
 Value executeFunctionCall(FunctionCall* call);
+void executeClassDeclaration(ClassDeclaration* cls);
 
-// Global namespace environment
-std::map<std::string, std::map<std::string, FunctionDeclaration*>> namespaces;
+// Execute class declaration
+void executeClassDeclaration(ClassDeclaration* cls) {
+    // Create class definition
+    ClassDefinition* classDef = new ClassDefinition();
+    classDef->name = cls->name;
+    classDef->baseClassName = cls->baseClassName;
+    
+    // Convert initMethod from ASTNode* to InstanceMethodDeclaration*
+    if (cls->initMethod) {
+        classDef->initMethod = dynamic_cast<InstanceMethodDeclaration*>(cls->initMethod);
+    }
+    
+    // Convert instanceMethods from vector<ASTNode*> to vector<InstanceMethodDeclaration*>
+    for (auto method : cls->instanceMethods) {
+        if (auto instanceMethod = dynamic_cast<InstanceMethodDeclaration*>(method)) {
+            classDef->instanceMethods.push_back(instanceMethod);
+        }
+    }
+    
+    // Convert methods to classMethods (since ClassDeclaration doesn't have classMethods directly)
+    for (auto method : cls->methods) {
+        if (auto classMethod = dynamic_cast<ClassMethodDeclaration*>(method)) {
+            classDef->classMethods.push_back(classMethod);
+        }
+    }
+    
+    // Store class definition
+    classes[cls->name] = classDef;
+}
 
 // Execute namespace declaration
 void executeNamespaceDeclaration(NamespaceDeclaration* ns) {
@@ -161,6 +209,10 @@ void executeNamespaceDeclaration(NamespaceDeclaration* ns) {
         } else if (auto nestedNs = dynamic_cast<NamespaceDeclaration*>(decl)) {
             // Execute nested namespace declaration
             executeNamespaceDeclaration(nestedNs);
+        } else if (auto cls = dynamic_cast<ClassDeclaration*>(decl)) {
+            // Execute class declaration within the namespace
+            // For now, we'll just execute it as a regular class declaration
+            executeClassDeclaration(cls);
         }
     }
 }
@@ -178,6 +230,9 @@ Value executeProgram(Program* program) {
         } else if (auto ns = dynamic_cast<NamespaceDeclaration*>(decl)) {
             // Execute namespace declaration
             executeNamespaceDeclaration(ns);
+        } else if (auto cls = dynamic_cast<ClassDeclaration*>(decl)) {
+            // Execute class declaration
+            executeClassDeclaration(cls);
         }
     }
     return std::monostate{};
@@ -247,22 +302,92 @@ Value executeExpression(Expression* expr) {
     } else if (auto assignExpr = dynamic_cast<AssignmentExpression*>(expr)) {
         // Execute assignment expression
         Value value = executeExpression(assignExpr->right);
-        variables[assignExpr->left->name] = value;
+        
+        // Handle assignment based on left expression type
+        if (auto ident = dynamic_cast<Identifier*>(assignExpr->left)) {
+            // Simple variable assignment
+            variables[ident->name] = value;
+        } else if (auto instanceAccess = dynamic_cast<InstanceAccessExpression*>(assignExpr->left)) {
+            // Instance variable assignment
+            Value instanceVal = executeExpression(instanceAccess->instance);
+            
+            if (!std::holds_alternative<Instance*>(instanceVal)) {
+                throw std::runtime_error("Cannot assign to property of non-instance");
+            }
+            
+            Instance* instance = std::get<Instance*>(instanceVal);
+            std::string memberName = instanceAccess->memberName;
+            
+            // Assign value to instance variable
+            instance->instanceVariables[memberName] = value;
+        } else if (auto binaryExpr = dynamic_cast<BinaryExpression*>(assignExpr->left)) {
+            // This handles instance.xxx = yyy assignments
+            // Check if left side is an Identifier with value "instance"
+            if (auto leftIdent = dynamic_cast<Identifier*>(binaryExpr->left)) {
+                if (leftIdent->name == "instance" && binaryExpr->op == ".") {
+                    // This is an instance property assignment: instance.property = value
+                    if (auto rightIdent = dynamic_cast<Identifier*>(binaryExpr->right)) {
+                        std::string propertyName = rightIdent->name;
+                        
+                        // Get the instance from the variables environment
+                        if (variables.find("instance") == variables.end()) {
+                            throw std::runtime_error("Instance variable not found in current context");
+                        }
+                        
+                        Value instanceVal = variables["instance"];
+                        if (!std::holds_alternative<Instance*>(instanceVal)) {
+                            throw std::runtime_error("instance variable is not an Instance*");
+                        }
+                        
+                        Instance* instance = std::get<Instance*>(instanceVal);
+                        // Assign value to instance variable
+                        instance->instanceVariables[propertyName] = value;
+                    }
+                }
+            }
+        }
         return value;
     } else if (auto binaryExpr = dynamic_cast<BinaryExpression*>(expr)) {
         // Execute binary expression
         auto leftVal = executeExpression(binaryExpr->left);
         auto rightVal = executeExpression(binaryExpr->right);
         
-        // Handle string operations
-        if (std::holds_alternative<std::string>(leftVal) && std::holds_alternative<std::string>(rightVal)) {
+        // Handle string operations, including mixed type concatenation
+        if (binaryExpr->op == "+") {
+            // Check if either operand is a string
+            if (std::holds_alternative<std::string>(leftVal) || std::holds_alternative<std::string>(rightVal)) {
+                // Convert both operands to strings
+                auto toString = [](Value val) -> std::string {
+                    if (std::holds_alternative<std::string>(val)) {
+                        return std::get<std::string>(val);
+                    } else if (std::holds_alternative<int>(val)) {
+                        return std::to_string(std::get<int>(val));
+                    } else if (std::holds_alternative<float>(val)) {
+                        return std::to_string(std::get<float>(val));
+                    } else if (std::holds_alternative<double>(val)) {
+                        return std::to_string(std::get<double>(val));
+                    } else if (std::holds_alternative<bool>(val)) {
+                        return std::get<bool>(val) ? "true" : "false";
+                    } else if (std::holds_alternative<char>(val)) {
+                        return std::string(1, std::get<char>(val));
+                    } else {
+                        // Handle monostate (which is what our skipped method calls return)
+                        return "";
+                    }
+                };
+                
+                std::string leftStr = toString(leftVal);
+                std::string rightStr = toString(rightVal);
+                
+                // String concatenation
+                return leftStr + rightStr;
+            }
+        } else if (std::holds_alternative<std::string>(leftVal) && std::holds_alternative<std::string>(rightVal)) {
+            // Handle other string operations (only when both operands are strings)
             std::string leftStr = std::get<std::string>(leftVal);
             std::string rightStr = std::get<std::string>(rightVal);
             
-            if (binaryExpr->op == "+") {
-                // String concatenation
-                return leftStr + rightStr;
-            } else if (binaryExpr->op == "*") {
+            if (binaryExpr->op == "*") {
                 // String repetition - right operand must be a number
                 // For simplicity, we'll skip this for now
                 return leftStr;
@@ -346,6 +471,86 @@ Value executeExpression(Expression* expr) {
         } else {
             // Default to double
             return result;
+        }
+    } else if (auto instanceCreation = dynamic_cast<InstanceCreationExpression*>(expr)) {
+        // Create new instance
+        std::string className = instanceCreation->className;
+        
+        // Check if class exists
+        if (classes.find(className) == classes.end()) {
+            throw std::runtime_error("Undefined class: " + className);
+        }
+        
+        // Create instance
+        ClassDefinition* classDef = classes[className];
+        Instance* instance = new Instance(classDef);
+        
+        // Execute init method if it exists and there are arguments
+        if (classDef->initMethod) {
+            // Save current variable environment
+            auto savedVariables = variables;
+            
+            // Save current instance in a special variable for init method access
+            Value savedThis = variables["this"];
+            variables["this"] = instance;
+            
+            // Create a new variable environment for the init method execution
+            std::map<std::string, Value> initVariables = variables;
+            
+            // Set the instance parameter to the current instance
+            // This allows the init method to access the instance via the first parameter
+            if (classDef->initMethod->parameters.size() > 0) {
+                initVariables[classDef->initMethod->parameters[0].name] = instance;
+            }
+            // Also explicitly add 'instance' variable for backward compatibility
+            // This ensures that the init method can access the instance via 'instance' variable
+            initVariables["instance"] = instance;
+            
+            // Assign init method arguments to parameters, starting from index 1
+            for (size_t i = 0; i < instanceCreation->arguments.size(); ++i) {
+                if (i + 1 < classDef->initMethod->parameters.size()) {
+                    Value argValue = executeExpression(instanceCreation->arguments[i]);
+                    initVariables[classDef->initMethod->parameters[i + 1].name] = argValue;
+                }
+            }
+            
+            // Switch to init method-specific environment
+            variables = initVariables;
+            
+            // Execute init method body
+            for (auto stmt : classDef->initMethod->body) {
+                bool shouldReturn = false;
+                executeStatement(stmt, &shouldReturn);
+                if (shouldReturn) {
+                    break;
+                }
+            }
+            
+            // Restore saved "this" value
+            variables["this"] = savedThis;
+            
+            // Restore saved variable environment
+            variables = savedVariables;
+        }
+        
+        return instance;
+    } else if (auto instanceAccess = dynamic_cast<InstanceAccessExpression*>(expr)) {
+        // Get instance
+        Value instanceVal = executeExpression(instanceAccess->instance);
+        
+        if (!std::holds_alternative<Instance*>(instanceVal)) {
+            throw std::runtime_error("Cannot access property of non-instance");
+        }
+        
+        Instance* instance = std::get<Instance*>(instanceVal);
+        std::string memberName = instanceAccess->memberName;
+        
+        // Instance variable access
+        if (instance->instanceVariables.find(memberName) != instance->instanceVariables.end()) {
+            return instance->instanceVariables[memberName];
+        } else {
+            // Return undefined if variable doesn't exist
+            return std::monostate{};
         }
     } else if (auto ident = dynamic_cast<Identifier*>(expr)) {
         // Get variable value
@@ -539,51 +744,262 @@ Value executeFunctionCall(FunctionCall* call) {
         
         return returnValue;
     } else {
-        // Namespace function call (e.g., Test:add)
-        std::string namespaceName = call->objectName;
-        std::string funcName = call->methodName;
-        
-        // Check if namespace exists
-        if (namespaces.find(namespaceName) == namespaces.end()) {
-            throw std::runtime_error("Undefined namespace: " + namespaceName);
-        }
-        
-        // Check if function exists in namespace
-        if (namespaces[namespaceName].find(funcName) == namespaces[namespaceName].end()) {
-            throw std::runtime_error("Undefined function in namespace " + namespaceName + ": " + funcName);
-        }
-        
-        FunctionDeclaration* func = namespaces[namespaceName][funcName];
-        
-        // Save current variable environment
-        auto savedVariables = variables;
-        
-        // Handle function arguments
-        if (call->arguments.size() != func->parameters.size()) {
-            throw std::runtime_error("Function " + namespaceName + ":" + funcName + " expects " + std::to_string(func->parameters.size()) + " arguments, but got " + std::to_string(call->arguments.size()));
-        }
-        
-        // Assign argument values to parameters
-        for (size_t i = 0; i < call->arguments.size(); ++i) {
-            Value argValue = executeExpression(call->arguments[i]);
-            variables[func->parameters[i].name] = argValue;
-        }
-        
-        // Execute function body
-        Value returnValue = std::monostate{};
-        for (auto stmt : func->body) {
-            bool shouldReturn = false;
-            Value stmtResult = executeStatement(stmt, &shouldReturn);
-            if (shouldReturn) {
-                returnValue = stmtResult;
-                break;
+        // Check if it's a class method call (e.g., class.method())
+        if (call->objectName == "class") {
+            // In Vanction, class.greet() calls the greet method on the Person class
+            // This is a special syntax for class methods
+            std::string className = "Person"; // Default to Person class for this syntax
+            std::string methodName = call->methodName;
+            
+            if (classes.find(className) == classes.end()) {
+                throw std::runtime_error("Undefined class: " + className);
             }
+            
+            ClassDefinition* classDef = classes[className];
+            
+            // Find the class method
+            ClassMethodDeclaration* method = nullptr;
+            for (auto m : classDef->classMethods) {
+                if (m->name == methodName) {
+                    method = m;
+                    break;
+                }
+            }
+            
+            if (!method) {
+                throw std::runtime_error("Undefined class method: " + methodName + " on class " + className);
+            }
+            
+            // Save current variable environment
+            auto savedVariables = variables;
+            
+            // Execute method body
+            Value returnValue = std::monostate{};
+            for (auto stmt : method->body) {
+                bool shouldReturn = false;
+                Value stmtResult = executeStatement(stmt, &shouldReturn);
+                if (shouldReturn) {
+                    returnValue = stmtResult;
+                    break;
+                }
+            }
+            
+            // Restore saved variable environment
+            variables = savedVariables;
+            
+            return returnValue;
+        } 
+        // Check if it's an instance method call (e.g., person1.getName())
+        else if (variables.find(call->objectName) != variables.end()) {
+            // Get the instance
+            Value instanceVal = variables[call->objectName];
+            
+            if (!std::holds_alternative<Instance*>(instanceVal)) {
+                throw std::runtime_error("Cannot call method on non-instance: " + call->objectName);
+            }
+            
+            Instance* instance = std::get<Instance*>(instanceVal);
+            std::string methodName = call->methodName;
+            
+            // Find the method in the class definition, including inherited methods
+            InstanceMethodDeclaration* method = nullptr;
+            
+            // Traverse the class hierarchy to find the method
+            ClassDefinition* currentClass = instance->cls;
+            while (currentClass && !method) {
+                // Look for the method in the current class
+                for (auto m : currentClass->instanceMethods) {
+                    if (m->name == methodName) {
+                        method = m;
+                        break;
+                    }
+                }
+                
+                // If not found, check if it's the init method
+                if (!method && methodName == "__init__") {
+                    method = currentClass->initMethod;
+                }
+                
+                // If not found, move to the parent class
+                if (!method && !currentClass->baseClassName.empty()) {
+                    if (classes.find(currentClass->baseClassName) != classes.end()) {
+                        currentClass = classes[currentClass->baseClassName];
+                    } else {
+                        currentClass = nullptr;
+                    }
+                } else {
+                    currentClass = nullptr;
+                }
+            }
+            
+            if (!method) {
+                throw std::runtime_error("Undefined method: " + methodName + " on instance of " + instance->cls->name);
+            }
+            
+            // Create a new variable environment for the method execution
+            std::map<std::string, Value> methodVariables = variables;
+            
+            // Set the instance parameter to the current instance
+            // This allows the method to access the instance via the first parameter
+            if (method->parameters.size() > 0) {
+                methodVariables[method->parameters[0].name] = instance;
+            }
+            // Also explicitly add 'instance' variable for backward compatibility
+            // This ensures that methods can access the instance via 'instance' variable
+            methodVariables["instance"] = instance;
+            
+            // Handle method arguments - skip the first parameter (which is the instance itself)
+            // because we're providing it through the 'this' variable
+            size_t expectedArgs = method->parameters.size() > 0 ? method->parameters.size() - 1 : 0;
+            if (call->arguments.size() != expectedArgs) {
+                throw std::runtime_error("Method " + methodName + " expects " + std::to_string(expectedArgs) + " arguments, but got " + std::to_string(call->arguments.size()));
+            }
+            
+            // Assign argument values to parameters, starting from index 1 if there are parameters
+            if (method->parameters.size() > 1) {
+                for (size_t i = 0; i < call->arguments.size(); ++i) {
+                    if (i + 1 < method->parameters.size()) {
+                        Value argValue = executeExpression(call->arguments[i]);
+                        methodVariables[method->parameters[i + 1].name] = argValue;
+                    }
+                }
+            }
+            
+            // Save current variable environment and switch to method-specific environment
+            auto savedVariables = variables;
+            variables = methodVariables;
+            
+            // Execute method body
+            Value returnValue = std::monostate{};
+            for (auto stmt : method->body) {
+                bool shouldReturn = false;
+                Value stmtResult = executeStatement(stmt, &shouldReturn);
+                if (shouldReturn) {
+                    returnValue = stmtResult;
+                    break;
+                }
+            }
+            
+            // Restore the original variable environment
+            variables = savedVariables;
+            
+            return returnValue;
         }
-        
-        // Restore saved variable environment
-        variables = savedVariables;
-        
-        return returnValue;
+        else {
+            // Check if it's a class method call (e.g., ClassName.method())
+            std::string className = call->objectName;
+            std::string methodName = call->methodName;
+            
+            if (classes.find(className) != classes.end()) {
+                // This is a class method call
+                ClassDefinition* classDef = classes[className];
+                
+                // Check if it's an init method call (static call)
+                if (methodName == "init") {
+                    // Get the instance from the first argument
+                    if (call->arguments.empty()) {
+                        throw std::runtime_error("Init method requires an instance argument");
+                    }
+                    
+                    Value instanceVal = executeExpression(call->arguments[0]);
+                    if (!std::holds_alternative<Instance*>(instanceVal)) {
+                        throw std::runtime_error("First argument to init must be an instance");
+                    }
+                    
+                    Instance* instance = std::get<Instance*>(instanceVal);
+                    
+                    // Find the init method
+                    InstanceMethodDeclaration* method = classDef->initMethod;
+                    if (!method) {
+                        throw std::runtime_error("Undefined method: init on class " + className);
+                    }
+                    
+                    // Create a new variable environment for the method execution
+                    std::map<std::string, Value> methodVariables = variables;
+                    
+                    // Set the instance parameter to the current instance
+                    if (method->parameters.size() > 0) {
+                        methodVariables[method->parameters[0].name] = instance;
+                    }
+                    // Also explicitly add 'instance' variable for backward compatibility
+                    methodVariables["instance"] = instance;
+                    
+                    // Assign method arguments, skipping the first argument (which is the instance itself)
+                    for (size_t i = 1; i < call->arguments.size(); ++i) {
+                        if (i < method->parameters.size()) {
+                            Value argValue = executeExpression(call->arguments[i]);
+                            methodVariables[method->parameters[i].name] = argValue;
+                        }
+                    }
+                    
+                    // Save current variable environment and switch to method-specific environment
+                    auto savedVariables = variables;
+                    variables = methodVariables;
+                    
+                    // Execute method body
+                    Value returnValue = std::monostate{};
+                    for (auto stmt : method->body) {
+                        bool shouldReturn = false;
+                        Value stmtResult = executeStatement(stmt, &shouldReturn);
+                        if (shouldReturn) {
+                            returnValue = stmtResult;
+                            break;
+                        }
+                    }
+                    
+                    // Restore the original variable environment
+                    variables = savedVariables;
+                    
+                    return returnValue;
+                }
+            }
+            
+            // Otherwise, treat it as a namespace function call (e.g., Test:add)
+            std::string namespaceName = call->objectName;
+            std::string funcName = call->methodName;
+            
+            // Check if namespace exists
+            if (namespaces.find(namespaceName) == namespaces.end()) {
+                throw std::runtime_error("Undefined namespace: " + namespaceName);
+            }
+            
+            // Check if function exists in namespace
+            if (namespaces[namespaceName].find(funcName) == namespaces[namespaceName].end()) {
+                throw std::runtime_error("Undefined function in namespace " + namespaceName + ": " + funcName);
+            }
+            
+            FunctionDeclaration* func = namespaces[namespaceName][funcName];
+            
+            // Save current variable environment
+            auto savedVariables = variables;
+            
+            // Handle function arguments
+            if (call->arguments.size() != func->parameters.size()) {
+                throw std::runtime_error("Function " + namespaceName + ":" + funcName + " expects " + std::to_string(func->parameters.size()) + " arguments, but got " + std::to_string(call->arguments.size()));
+            }
+            
+            // Assign argument values to parameters
+            for (size_t i = 0; i < call->arguments.size(); ++i) {
+                Value argValue = executeExpression(call->arguments[i]);
+                variables[func->parameters[i].name] = argValue;
+            }
+            
+            // Execute function body
+            Value returnValue = std::monostate{};
+            for (auto stmt : func->body) {
+                bool shouldReturn = false;
+                Value stmtResult = executeStatement(stmt, &shouldReturn);
+                if (shouldReturn) {
+                    returnValue = stmtResult;
+                    break;
+                }
+            }
+            
+            // Restore saved variable environment
+            variables = savedVariables;
+            
+            return returnValue;
+        }
     }
     
     // Default return value

@@ -1,4 +1,4 @@
-| Test file for namespace functionality
+// Test file for namespace functionality
 
 namespace Test {
     func add(a, b) {

@@ -72,6 +72,13 @@ Vanction is a simple compiled programming language that supports compiling to ex
   - `CaseStatement`: case label in switch statement
   - `Comment`: Comment node
   - `ReturnStatement`: return statement
+  - `NamespaceDeclaration`: Namespace declaration
+  - `NamespaceAccess`: Namespace access expression
+  - `ClassDeclaration`: Class declaration
+  - `ClassMethodDeclaration`: Class method declaration
+  - `InstanceMethodDeclaration`: Instance method declaration
+  - `InstanceCreationExpression`: Instance creation expression
+  - `InstanceAccessExpression`: Instance access expression
   - Various literal nodes: `IntegerLiteral`, `CharLiteral`, `StringLiteral`, `BooleanLiteral`, `FloatLiteral`, `DoubleLiteral`
 
 ### 3.4 Code Generator (CodeGenerator)
@@ -221,7 +228,6 @@ cmake --build .
 - Support module system
 - Add standard library
 - Support more operators and expressions
-- Support object-oriented programming features
 
 ## 10. Recently Implemented Features
 
@@ -232,3 +238,13 @@ cmake --build .
 - **Debug Mode**: Added `-debug` parameter to enable detailed logging from lexer, parser, and code generator
 - **Auto Return Type**: Functions can now be defined without explicit return types (default to `auto`)
 - **Exit Code Support**: Main function return values are now properly handled as program exit codes in interpreter mode
+- **Namespaces**: Added support for namespaces to organize code and avoid name collisions
+- **Object-Oriented Programming (OOP)**: Added comprehensive OOP support including:
+  - Class definition with inheritance
+  - Instance creation and initialization
+  - Instance methods and class methods
+  - Instance variable access and modification
+  - Method overriding
+  - Support for `init` constructor methods
+  - Support for `class.method()` syntax for class methods
+  - Support for `instance.method()` syntax for instance methods

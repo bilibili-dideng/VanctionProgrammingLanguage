@@ -1,0 +1,31 @@
+| Test class definition within namespace
+namespace TestNamespace {
+    | Define a class inside namespace
+    class Person() {
+        instance.init(instance, name, age) {
+            instance.name = name;
+            instance.age = age;
+        }
+        
+        instance.getName(instance) {
+            return instance.name;
+        }
+        
+        instance.getAge(instance) {
+            return instance.age;
+        }
+    }
+}
+
+func main() {
+    | Create an instance of the class (direct access, not via namespace qualifier)
+    | Note: Currently, Vanction doesn't support namespace:Class syntax for instance creation
+    | but it does support defining classes within namespaces
+    person1 = instance Person("Alice", 30);
+    
+    | Call instance methods
+    System.print("Name: " + person1.getName());
+    System.print("Age: " + person1.getAge());
+    
+    return 0;
+}

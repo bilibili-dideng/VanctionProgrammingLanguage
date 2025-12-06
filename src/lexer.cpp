@@ -263,7 +263,7 @@ Token Lexer::getNextToken() {
     if (current == ',') {
         advance();
         Token token;
-        token.type = IDENTIFIER;
+        token.type = COMMA;
         token.value = ",";
         token.line = line;
         token.column = column - 1;
@@ -330,7 +330,9 @@ Token Lexer::parseIdentifierOrKeyword() {
         value == "float" || value == "double" || value == "AND" || value == "OR" || value == "XOR" ||
         // Control flow keywords
         value == "if" || value == "else" || value == "else-if" || value == "for" || value == "while" || value == "do" ||
-        value == "switch" || value == "case" || value == "in" || value == "return" || value == "namespace") {
+        value == "switch" || value == "case" || value == "in" || value == "return" || value == "namespace" ||
+        // OOP keywords
+        value == "class" || value == "instance" || value == "init") {
         token.type = KEYWORD;
         token.value = value;
         if (debugMode) {

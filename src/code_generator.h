@@ -82,6 +82,21 @@ private:
     
     // Generate switch statement
     std::string generateSwitchStatement(SwitchStatement* stmt);
+    
+    // Generate class declaration
+    std::string generateClassDeclaration(ClassDeclaration* cls);
+    
+    // Generate class method declaration
+    std::string generateClassMethodDeclaration(ClassMethodDeclaration* method);
+    
+    // Generate instance method declaration
+    std::string generateInstanceMethodDeclaration(InstanceMethodDeclaration* method);
+    
+    // Generate instance creation expression
+    std::string generateInstanceCreationExpression(InstanceCreationExpression* expr);
+    
+    // Generate instance access expression
+    std::string generateInstanceAccessExpression(InstanceAccessExpression* expr);
 };
 
 #endif // VANCTION_CODE_GENERATOR_H

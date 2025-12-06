@@ -29,7 +29,7 @@ std::string CodeGenerator::generate(Program* program) {
     std::string code;
     
     // Add header files
-    code += "#include <iostream>\n\n";
+    code += "#include <iostream>\n#include <string>\n\n";
     
     // Generate all declarations
     for (auto decl : program->declarations) {
@@ -37,6 +37,8 @@ std::string CodeGenerator::generate(Program* program) {
             code += generateFunctionDeclaration(func);
         } else if (auto ns = dynamic_cast<NamespaceDeclaration*>(decl)) {
             code += generateNamespaceDeclaration(ns);
+        } else if (auto cls = dynamic_cast<ClassDeclaration*>(decl)) {
+            code += generateClassDeclaration(cls);
         }
     }
     
@@ -193,6 +195,10 @@ std::string CodeGenerator::generateExpression(Expression* expr) {
         return generateAssignmentExpression(assignExpr);
     } else if (auto funcCall = dynamic_cast<FunctionCall*>(expr)) {
         return generateFunctionCall(funcCall);
+    } else if (auto instanceCreate = dynamic_cast<InstanceCreationExpression*>(expr)) {
+        return generateInstanceCreationExpression(instanceCreate);
+    } else if (auto instanceAccess = dynamic_cast<InstanceAccessExpression*>(expr)) {
+        return generateInstanceAccessExpression(instanceAccess);
     }
     return "// Unimplemented expression";
 }
@@ -447,6 +453,163 @@ std::string CodeGenerator::generateSwitchStatement(SwitchStatement* stmt) {
     
     code += "    }\n";
     return code;
+}
+
+// Generate class declaration
+std::string CodeGenerator::generateClassDeclaration(ClassDeclaration* cls) {
+    std::string code;
+    
+    // Generate class start with inheritance if applicable
+    if (!cls->baseClassName.empty()) {
+        code += "class " + cls->name + " : public " + cls->baseClassName + " {\n";
+    } else {
+        code += "class " + cls->name + " {\n";
+    }
+    
+    // Generate public section
+    code += "public:\n";
+    
+    // Generate init method as constructor
+    if (auto initMethod = dynamic_cast<InstanceMethodDeclaration*>(cls->initMethod)) {
+        // Generate constructor signature
+        code += "    " + cls->name + "(";
+        
+        // Generate parameters (skip the first 'instance' parameter)
+        for (size_t i = 0; i < initMethod->parameters.size(); ++i) {
+            const auto& param = initMethod->parameters[i];
+            code += "auto " + param.name;
+            if (i < initMethod->parameters.size() - 1) {
+                code += ", ";
+            }
+        }
+        code += ") {\n";
+        
+        // Generate constructor body
+        for (auto stmt : initMethod->body) {
+            if (auto exprStmt = dynamic_cast<ExpressionStatement*>(stmt)) {
+                code += "        " + generateExpressionStatement(exprStmt).substr(4);
+            } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(stmt)) {
+                code += "        " + generateVariableDeclaration(varDecl).substr(4);
+            } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
+                // Skip return statements in constructors
+            } else {
+                code += "        // Unimplemented statement type in constructor\n";
+            }
+        }
+        
+        code += "    }\n\n";
+    }
+    
+    // Generate instance methods
+    for (auto method : cls->instanceMethods) {
+        if (auto instanceMethod = dynamic_cast<InstanceMethodDeclaration*>(method)) {
+            code += generateInstanceMethodDeclaration(instanceMethod);
+        }
+    }
+    
+    // Generate class end
+    code += "};\n\n";
+    
+    return code;
+}
+
+// Generate class method declaration
+std::string CodeGenerator::generateClassMethodDeclaration(ClassMethodDeclaration* method) {
+    std::string code;
+    
+    // Class methods are generated as static methods
+    code += "    static " + method->returnType + " " + method->name + "(";
+    
+    // Generate parameters
+    for (size_t i = 0; i < method->parameters.size(); ++i) {
+        const auto& param = method->parameters[i];
+        code += "auto " + param.name;
+        if (i < method->parameters.size() - 1) {
+            code += ", ";
+        }
+    }
+    code += ") {\n";
+    
+    // Generate method body
+    for (auto stmt : method->body) {
+        if (auto exprStmt = dynamic_cast<ExpressionStatement*>(stmt)) {
+            code += "        " + generateExpressionStatement(exprStmt).substr(4);
+        } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(stmt)) {
+            code += "        " + generateVariableDeclaration(varDecl).substr(4);
+        } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
+            code += "        return";
+            if (returnStmt->expression) {
+                code += " " + generateExpression(returnStmt->expression);
+            }
+            code += ";\n";
+        } else {
+            code += "        // Unimplemented statement type in class method\n";
+        }
+    }
+    
+    code += "    }\n\n";
+    
+    return code;
+}
+
+// Generate instance method declaration
+std::string CodeGenerator::generateInstanceMethodDeclaration(InstanceMethodDeclaration* method) {
+    std::string code;
+    
+    // Generate method signature (skip the first 'instance' parameter)
+    code += "    " + method->returnType + " " + method->name + "(";
+    
+    // Generate parameters
+    for (size_t i = 0; i < method->parameters.size(); ++i) {
+        const auto& param = method->parameters[i];
+        code += "auto " + param.name;
+        if (i < method->parameters.size() - 1) {
+            code += ", ";
+        }
+    }
+    code += ") {\n";
+    
+    // Generate method body
+    for (auto stmt : method->body) {
+        if (auto exprStmt = dynamic_cast<ExpressionStatement*>(stmt)) {
+            code += "        " + generateExpressionStatement(exprStmt).substr(4);
+        } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(stmt)) {
+            code += "        " + generateVariableDeclaration(varDecl).substr(4);
+        } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
+            code += "        return";
+            if (returnStmt->expression) {
+                code += " " + generateExpression(returnStmt->expression);
+            }
+            code += ";\n";
+        } else {
+            code += "        // Unimplemented statement type in instance method\n";
+        }
+    }
+    
+    code += "    }\n\n";
+    
+    return code;
+}
+
+// Generate instance creation expression
+std::string CodeGenerator::generateInstanceCreationExpression(InstanceCreationExpression* expr) {
+    std::string code = "std::make_unique<" + expr->className + ">(";
+    
+    // Generate arguments
+    for (size_t i = 0; i < expr->arguments.size(); ++i) {
+        code += generateExpression(expr->arguments[i]);
+        if (i < expr->arguments.size() - 1) {
+            code += ", ";
+        }
+    }
+    
+    code += ")";
+    return code;
+}
+
+// Generate instance access expression
+std::string CodeGenerator::generateInstanceAccessExpression(InstanceAccessExpression* expr) {
+    return generateExpression(expr->instance) + "." + expr->memberName;
 }
 
 // Generate assignment expression

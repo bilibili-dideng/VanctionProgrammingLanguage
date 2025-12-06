@@ -387,6 +387,164 @@ func main() {
 }
 ```
 
+### 4.9 面向对象编程 (OOP)
+
+Vanction 支持基本的面向对象编程特性，包括类定义、继承、实例方法、类方法和实例变量。
+
+#### 4.9.1 类定义
+
+```vanction
+| 类声明语法
+class 类名(父类名) {
+    | 实例初始化方法
+    instance.init(instance, 参数) {
+        | 初始化实例变量
+        instance.变量名 = 值;
+    }
+    
+    | 实例方法
+    instance.方法名(instance, 参数) {
+        | 方法体
+        return 结果;
+    }
+    
+    | 类方法
+    class.方法名() {
+        | 方法体
+        return 结果;
+    }
+}
+
+| 示例：基类 Person
+class Person() {
+    instance.init(instance, name, age) {
+        instance.name = name;
+        instance.age = age;
+    }
+    
+    instance.getName(instance) {
+        return instance.name;
+    }
+    
+    instance.getAge(instance) {
+        return instance.age;
+    }
+    
+    class.greet() {
+        System.print("Hello from Person class!");
+    }
+}
+```
+
+#### 4.9.2 类继承
+
+```vanction
+| 派生类声明语法
+class 派生类名(父类名) {
+    | 重写 init 方法
+    instance.init(instance, 参数) {
+        | 调用父类 init 方法
+        父类名.init(instance, 父类参数);
+        | 初始化额外的实例变量
+        instance.派生变量 = 值;
+    }
+    
+    | 重写实例方法
+    instance.方法名(instance, 参数) {
+        | 方法体
+        return 结果;
+    }
+}
+
+| 示例：派生类 Student 继承自 Person
+class Student(Person) {
+    instance.init(instance, name, age, studentId) {
+        | 调用父类构造函数
+        Person.init(instance, name, age);
+        instance.studentId = studentId;
+    }
+    
+    instance.getStudentId(instance) {
+        return instance.studentId;
+    }
+    
+    | 重写父类方法
+    instance.getName(instance) {
+        return "Student: " + instance.name;
+    }
+}
+```
+
+#### 4.9.3 实例创建
+
+```vanction
+| 创建实例语法
+变量 = instance 类名(参数);
+
+| 示例
+func main() {
+    | 创建 Person 实例
+    person1 = instance Person("Alice", 30);
+    
+    | 创建 Student 实例
+    student1 = instance Student("Bob", 20, "S12345");
+}
+```
+
+#### 4.9.4 实例方法调用
+
+```vanction
+| 实例方法调用语法
+结果 = 实例名.方法名(参数);
+
+| 示例
+func main() {
+    person1 = instance Person("Alice", 30);
+    
+    | 调用实例方法
+    string name = person1.getName();
+    int age = person1.getAge();
+    
+    System.print("Name: " + name);
+    System.print("Age: " + age);
+}
+```
+
+#### 4.9.5 类方法调用
+
+```vanction
+| 类方法调用语法
+class.方法名();
+
+| 示例
+func main() {
+    | 调用类方法
+    class.greet();
+}
+```
+
+#### 4.9.6 实例变量访问
+
+```vanction
+| 访问实例变量
+值 = 实例名.变量名;
+
+| 修改实例变量
+实例名.变量名 = 新值;
+
+| 示例
+func main() {
+    person1 = instance Person("Alice", 30);
+    
+    | 访问实例变量
+    System.print("Current age: " + person1.getAge());
+    
+    | 修改实例变量
+    person1.age = 31;
+    System.print("Updated age: " + person1.getAge());
+}
+```
+
 ## 5. 错误处理
 
 Vanction 拥有完善的错误处理系统，提供清晰格式化的错误信息。当错误发生时，解释器/编译器将显示：

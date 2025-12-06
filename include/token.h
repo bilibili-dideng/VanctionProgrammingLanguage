@@ -15,6 +15,7 @@ enum TokenType {
     DOT,
     COLON,
     SEMICOLON,
+    COMMA,
     LPAREN,
     RPAREN,
     LBRACE,
