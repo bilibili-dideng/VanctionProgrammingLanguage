@@ -18,6 +18,9 @@ std::string getExecutableDir();
 // Global configuration declaration
 extern std::map<std::string, std::string> config;
 
+// Debug flag - declare at the top so it's accessible to all functions
+bool debugMode = false;
+
 // Read file content
 std::string readFile(const std::string& filePath) {
     std::ifstream file(filePath);
@@ -98,7 +101,7 @@ std::string getAppDataDir() {
 // Create directory if it doesn't exist
 void createDirectoryIfNotExists(const std::string& dirPath) {
     // Windows-compatible implementation
-    std::string command = "mkdir \"" + dirPath + "\" 2>nul || echo Directory already exists";
+    std::string command = "mkdir \"" + dirPath + "\" 2>nul";
     system(command.c_str());
 }
 
@@ -166,6 +169,22 @@ void executeClassDeclaration(ClassDeclaration* cls);
 
 // Execute class declaration
 void executeClassDeclaration(ClassDeclaration* cls) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Executing class declaration: " << cls->name;
+        if (!cls->baseClassName.empty()) {
+            std::cout << " (inherits from " << cls->baseClassName << ")";
+        }
+        std::cout << std::endl;
+        std::cout << "[DEBUG] Class has " << cls->instanceMethods.size() << " instance methods, " 
+                  << cls->methods.size() << " class methods, ";
+        if (cls->initMethod) {
+            std::cout << "and an init method";
+        } else {
+            std::cout << "and no init method";
+        }
+        std::cout << std::endl;
+    }
+    
     // Create class definition
     ClassDefinition* classDef = new ClassDefinition();
     classDef->name = cls->name;
@@ -192,6 +211,10 @@ void executeClassDeclaration(ClassDeclaration* cls) {
     
     // Store class definition
     classes[cls->name] = classDef;
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] Class " << cls->name << " definition stored successfully" << std::endl;
+    }
 }
 
 // Execute namespace declaration
@@ -476,6 +499,10 @@ Value executeExpression(Expression* expr) {
         // Create new instance
         std::string className = instanceCreation->className;
         
+        if (debugMode) {
+            std::cout << "[DEBUG] Creating instance of class: " << className << std::endl;
+        }
+        
         // Check if class exists
         if (classes.find(className) == classes.end()) {
             throw std::runtime_error("Undefined class: " + className);
@@ -484,6 +511,10 @@ Value executeExpression(Expression* expr) {
         // Create instance
         ClassDefinition* classDef = classes[className];
         Instance* instance = new Instance(classDef);
+        
+        if (debugMode) {
+            std::cout << "[DEBUG] Instance created successfully" << std::endl;
+        }
         
         // Execute init method if it exists and there are arguments
         if (classDef->initMethod) {
@@ -507,10 +538,48 @@ Value executeExpression(Expression* expr) {
             initVariables["instance"] = instance;
             
             // Assign init method arguments to parameters, starting from index 1
+            // (index 0 is the instance parameter which we already set)
+            if (debugMode) {
+                std::cout << "[DEBUG] Instance creation with " << instanceCreation->arguments.size() << " arguments" << std::endl;
+                std::cout << "[DEBUG] Init method has " << classDef->initMethod->parameters.size() << " parameters" << std::endl;
+            }
             for (size_t i = 0; i < instanceCreation->arguments.size(); ++i) {
-                if (i + 1 < classDef->initMethod->parameters.size()) {
+                size_t paramIndex = i + 1;  // Skip the first parameter (instance)
+                if (debugMode) {
+                    std::cout << "[DEBUG] Processing argument " << i << " -> parameter " << paramIndex << std::endl;
+                }
+                if (paramIndex < classDef->initMethod->parameters.size()) {
+                    if (debugMode) {
+                        std::cout << "[DEBUG] Executing argument " << i << " for parameter " << paramIndex << std::endl;
+                    }
                     Value argValue = executeExpression(instanceCreation->arguments[i]);
-                    initVariables[classDef->initMethod->parameters[i + 1].name] = argValue;
+                    if (debugMode) {
+                        std::cout << "[DEBUG] Argument " << i << " result: ";
+                        if (std::holds_alternative<std::string>(argValue)) {
+                            std::cout << "string='" << std::get<std::string>(argValue) << "'";
+                        } else if (std::holds_alternative<int>(argValue)) {
+                            std::cout << "int=" << std::get<int>(argValue);
+                        } else if (std::holds_alternative<float>(argValue)) {
+                            std::cout << "float=" << std::get<float>(argValue);
+                        } else if (std::holds_alternative<double>(argValue)) {
+                            std::cout << "double=" << std::get<double>(argValue);
+                        } else if (std::holds_alternative<bool>(argValue)) {
+                            std::cout << "bool=" << (std::get<bool>(argValue) ? "true" : "false");
+                        } else if (std::holds_alternative<Instance*>(argValue)) {
+                            std::cout << "instance";
+                        } else if (std::holds_alternative<std::monostate>(argValue)) {
+                            std::cout << "undefined";
+                        } else {
+                            std::cout << "other type";
+                        }
+                        std::cout << std::endl;
+                        std::cout << "[DEBUG] Assigning to parameter: " << classDef->initMethod->parameters[paramIndex].name << std::endl;
+                    }
+                    initVariables[classDef->initMethod->parameters[paramIndex].name] = argValue;
+                } else {
+                    if (debugMode) {
+                        std::cout << "[DEBUG] Skipping argument " << i << " - parameter index " << paramIndex << " out of range" << std::endl;
+                    }
                 }
             }
             
@@ -545,11 +614,40 @@ Value executeExpression(Expression* expr) {
         Instance* instance = std::get<Instance*>(instanceVal);
         std::string memberName = instanceAccess->memberName;
         
+        if (debugMode) {
+            std::cout << "[DEBUG] Instance variable access: " << memberName << " on instance of class " << instance->cls->name << std::endl;
+        }
+        
         // Instance variable access
         if (instance->instanceVariables.find(memberName) != instance->instanceVariables.end()) {
-            return instance->instanceVariables[memberName];
+            Value result = instance->instanceVariables[memberName];
+            if (debugMode) {
+                std::cout << "[DEBUG] Found variable " << memberName << " with value: ";
+                if (std::holds_alternative<std::string>(result)) {
+                    std::cout << "string='" << std::get<std::string>(result) << "'";
+                } else if (std::holds_alternative<int>(result)) {
+                    std::cout << "int=" << std::get<int>(result);
+                } else if (std::holds_alternative<float>(result)) {
+                    std::cout << "float=" << std::get<float>(result);
+                } else if (std::holds_alternative<double>(result)) {
+                    std::cout << "double=" << std::get<double>(result);
+                } else if (std::holds_alternative<bool>(result)) {
+                    std::cout << "bool=" << (std::get<bool>(result) ? "true" : "false");
+                } else if (std::holds_alternative<Instance*>(result)) {
+                    std::cout << "instance";
+                } else if (std::holds_alternative<std::monostate>(result)) {
+                    std::cout << "undefined";
+                } else {
+                    std::cout << "other type";
+                }
+                std::cout << std::endl;
+            }
+            return result;
         } else {
             // Return undefined if variable doesn't exist
+            if (debugMode) {
+                std::cout << "[DEBUG] Variable " << memberName << " not found, returning undefined" << std::endl;
+            }
             return std::monostate{};
         }
     } else if (auto ident = dynamic_cast<Identifier*>(expr)) {
@@ -586,6 +684,13 @@ Value executeExpression(Expression* expr) {
 
 // Execute function call
 Value executeFunctionCall(FunctionCall* call) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Function call: ";
+        if (!call->objectName.empty()) {
+            std::cout << call->objectName << ".";
+        }
+        std::cout << call->methodName << "(" << call->arguments.size() << " arguments)" << std::endl;
+    }
     if (call->objectName == "System" && call->methodName == "print") {
         // Handle System.print
         for (size_t i = 0; i < call->arguments.size(); ++i) {
@@ -801,6 +906,10 @@ Value executeFunctionCall(FunctionCall* call) {
             Instance* instance = std::get<Instance*>(instanceVal);
             std::string methodName = call->methodName;
             
+            if (debugMode) {
+                std::cout << "[DEBUG] Instance method call: " << call->objectName << "." << methodName << " on instance of class " << instance->cls->name << std::endl;
+            }
+            
             // Find the method in the class definition, including inherited methods
             InstanceMethodDeclaration* method = nullptr;
             
@@ -811,6 +920,9 @@ Value executeFunctionCall(FunctionCall* call) {
                 for (auto m : currentClass->instanceMethods) {
                     if (m->name == methodName) {
                         method = m;
+                        if (debugMode) {
+                            std::cout << "[DEBUG] Found method " << methodName << " in class " << currentClass->name << std::endl;
+                        }
                         break;
                     }
                 }
@@ -818,10 +930,16 @@ Value executeFunctionCall(FunctionCall* call) {
                 // If not found, check if it's the init method
                 if (!method && methodName == "__init__") {
                     method = currentClass->initMethod;
+                    if (debugMode && method) {
+                        std::cout << "[DEBUG] Found init method in class " << currentClass->name << std::endl;
+                    }
                 }
                 
                 // If not found, move to the parent class
                 if (!method && !currentClass->baseClassName.empty()) {
+                    if (debugMode) {
+                        std::cout << "[DEBUG] Method " << methodName << " not found in class " << currentClass->name << ", checking parent class " << currentClass->baseClassName << std::endl;
+                    }
                     if (classes.find(currentClass->baseClassName) != classes.end()) {
                         currentClass = classes[currentClass->baseClassName];
                     } else {
@@ -848,20 +966,24 @@ Value executeFunctionCall(FunctionCall* call) {
             // This ensures that methods can access the instance via 'instance' variable
             methodVariables["instance"] = instance;
             
-            // Handle method arguments - skip the first parameter (which is the instance itself)
-            // because we're providing it through the 'this' variable
-            size_t expectedArgs = method->parameters.size() > 0 ? method->parameters.size() - 1 : 0;
+            // For instance methods (non-init), parameters list already excludes the implicit instance parameter
+            // For init method, parameters list includes the instance parameter, so we need to adjust
+            bool isInitMethod = (methodName == "init" || methodName == "__init__");
+            size_t expectedArgs = isInitMethod ? (method->parameters.size() > 0 ? method->parameters.size() - 1 : 0) : method->parameters.size();
             if (call->arguments.size() != expectedArgs) {
                 throw std::runtime_error("Method " + methodName + " expects " + std::to_string(expectedArgs) + " arguments, but got " + std::to_string(call->arguments.size()));
             }
             
             // Assign argument values to parameters, starting from index 1 if there are parameters
-            if (method->parameters.size() > 1) {
-                for (size_t i = 0; i < call->arguments.size(); ++i) {
-                    if (i + 1 < method->parameters.size()) {
-                        Value argValue = executeExpression(call->arguments[i]);
-                        methodVariables[method->parameters[i + 1].name] = argValue;
-                    }
+            for (size_t i = 0; i < call->arguments.size(); ++i) {
+                if (i + 1 < method->parameters.size()) {
+                    Value argValue = executeExpression(call->arguments[i]);
+                    methodVariables[method->parameters[i + 1].name] = argValue;
+                } else if (i < method->parameters.size()) {
+                    // For methods with only one parameter (the instance parameter), we still need to assign arguments
+                    // if the method was defined without the instance parameter explicitly
+                    Value argValue = executeExpression(call->arguments[i]);
+                    methodVariables[method->parameters[i].name] = argValue;
                 }
             }
             
@@ -1107,9 +1229,6 @@ void saveConfig() {
     configFile.close();
 }
 
-// Debug flag
-bool debugMode = false;
-
 // Print help message
 void printHelp(std::ostream& os) {
     os << "Usage: vanction <RunMod> [options] <file.vn>" << std::endl;
@@ -1120,10 +1239,14 @@ void printHelp(std::ostream& os) {
     os << "  -g         Compile to executable file (using GCC)" << std::endl;
     os << "  -o <file>  Specify output filename for compilation" << std::endl;
     os << "  -debug     Enable debug logging for lexer, parser, main, and codegenerator" << std::endl;
-    os << "  -config    Configure program settings (e.g., -config GCC set <path>, -config GCC get, or -config GCC reset)" << std::endl;
+    os << "  -config    Configure program settings" << std::endl;
     os << "  -h, --help Show this help message" << std::endl;
     os << "Configurable settings: " << std::endl;
     os << "  GCC        Path to GCC compiler executable" << std::endl;
+    os << "Config Usage:" << std::endl;
+    os << "    -config <ConfigurableSetting> set <value>  Set a configuration value" << std::endl;
+    os << "    -config <ConfigurableSetting> get         Get a configuration value" << std::endl;
+    os << "    -config <ConfigurableSetting> reset      Reset a configuration value to default" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -1329,17 +1452,17 @@ int main(int argc, char* argv[]) {
             
             if (result == 0) {
                 std::cout << "GCC compilation successful!" << std::endl;
+                
+                // Clean up temporary file
+                std::remove(cppFile.c_str());
+                std::cout << "Cleaned up temporary files" << std::endl;
             } else {
                 Error error(ErrorType::CompilationError, "GCC compilation failed", filePath, 1, 1);
                 errorReporter.report(error);
-                std::remove(cppFile.c_str());
+                std::cout << "Generated C++ code preserved at: " << cppFile << std::endl;
                 delete program;
                 return 1;
             }
-            
-            // Clean up temporary file
-            std::remove(cppFile.c_str());
-            std::cout << "Cleaned up temporary files" << std::endl;
             
             // Clean up AST
             delete program;
@@ -1409,7 +1532,7 @@ int main(int argc, char* argv[]) {
         
         // Determine error type based on error message
         std::string errorMsg = e.what();
-        ErrorType errorType = ErrorType::CError;
+        ErrorType errorType = ErrorType::UnknownError;
         
         if (errorMsg.find("Syntax error") != std::string::npos ||
             errorMsg.find("Function definition") != std::string::npos ||
@@ -1421,6 +1544,8 @@ int main(int argc, char* argv[]) {
             errorType = ErrorType::TokenError;
         } else if (errorMsg.find("Division by zero") != std::string::npos) {
             errorType = ErrorType::DivideByZeroError;
+        } else if (errorMsg.find("Method") != std::string::npos) {
+            errorType = ErrorType::MethodError;
         } else if (errorMsg.find("Cannot convert") != std::string::npos) {
             errorType = ErrorType::ValueError;
         } else if (errorMsg.find("Main function") != std::string::npos) {

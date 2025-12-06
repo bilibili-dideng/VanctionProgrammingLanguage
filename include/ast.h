@@ -422,11 +422,12 @@ public:
 // Instance creation expression
 class InstanceCreationExpression : public Expression {
 public:
+    std::string namespaceName;
     std::string className;
     std::vector<Expression*> arguments;
     
-    InstanceCreationExpression(const std::string& className)
-        : className(className) {}
+    InstanceCreationExpression(const std::string& className, const std::string& namespaceName = "")
+        : className(className), namespaceName(namespaceName) {}
     
     ~InstanceCreationExpression() {
         for (auto arg : arguments) {

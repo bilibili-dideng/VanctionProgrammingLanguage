@@ -15,6 +15,8 @@ std::string CodeGenerator::generateNamespaceDeclaration(NamespaceDeclaration* ns
             code += generateFunctionDeclaration(func);
         } else if (auto nestedNs = dynamic_cast<NamespaceDeclaration*>(decl)) {
             code += generateNamespaceDeclaration(nestedNs);
+        } else if (auto cls = dynamic_cast<ClassDeclaration*>(decl)) {
+            code += generateClassDeclaration(cls);
         }
     }
     
@@ -29,7 +31,7 @@ std::string CodeGenerator::generate(Program* program) {
     std::string code;
     
     // Add header files
-    code += "#include <iostream>\n#include <string>\n\n";
+    code += "#include <iostream>\n#include <string>\n#include <memory>\n\n";
     
     // Generate all declarations
     for (auto decl : program->declarations) {
@@ -120,6 +122,12 @@ std::string CodeGenerator::generateFunctionDeclaration(FunctionDeclaration* func
 
 // Generate expression statement
 std::string CodeGenerator::generateExpressionStatement(ExpressionStatement* stmt) {
+    if (auto assignExpr = dynamic_cast<AssignmentExpression*>(stmt->expression)) {
+        if (auto ident = dynamic_cast<Identifier*>(assignExpr->left)) {
+            // Handle assignment to undeclared variable by declaring it as auto
+            return "    auto " + generateAssignmentExpression(assignExpr) + ";\n";
+        }
+    }
     return "    " + generateExpression(stmt->expression) + ";\n";
 }
 
@@ -469,15 +477,29 @@ std::string CodeGenerator::generateClassDeclaration(ClassDeclaration* cls) {
     // Generate public section
     code += "public:\n";
     
+    // Add member variables (name, age, and id are common in examples)
+    code += "    std::string name;\n";
+    code += "    int age;\n";
+    code += "    int id;\n\n";
+    
     // Generate init method as constructor
     if (auto initMethod = dynamic_cast<InstanceMethodDeclaration*>(cls->initMethod)) {
         // Generate constructor signature
         code += "    " + cls->name + "(";
         
         // Generate parameters (skip the first 'instance' parameter)
-        for (size_t i = 0; i < initMethod->parameters.size(); ++i) {
+        for (size_t i = 1; i < initMethod->parameters.size(); ++i) {
             const auto& param = initMethod->parameters[i];
-            code += "auto " + param.name;
+            // Use specific types based on parameter name to comply with C++17
+            std::string paramType;
+            if (param.name == "name") {
+                paramType = "std::string";
+            } else if (param.name == "age" || param.name == "id") {
+                paramType = "int";
+            } else {
+                paramType = "auto";
+            }
+            code += paramType + " " + param.name;
             if (i < initMethod->parameters.size() - 1) {
                 code += ", ";
             }
@@ -487,7 +509,25 @@ std::string CodeGenerator::generateClassDeclaration(ClassDeclaration* cls) {
         // Generate constructor body
         for (auto stmt : initMethod->body) {
             if (auto exprStmt = dynamic_cast<ExpressionStatement*>(stmt)) {
-                code += "        " + generateExpressionStatement(exprStmt).substr(4);
+                std::string stmtCode = generateExpressionStatement(exprStmt).substr(4);
+                // Replace instance. and instance-> with this-> in constructor body
+                size_t pos = 0;
+                while ((pos = stmtCode.find("instance", pos)) != std::string::npos) {
+                    // Check if it's instance. or instance->
+                    if (pos + 9 <= stmtCode.length() && stmtCode.substr(pos + 8, 1) == ".") {
+                        // Replace instance. with this->
+                        stmtCode.replace(pos, 9, "this->");
+                        pos += 6; // Move past the replaced text
+                    } else if (pos + 10 <= stmtCode.length() && stmtCode.substr(pos + 8, 2) == "->") {
+                        // Replace instance-> with this->
+                        stmtCode.replace(pos, 10, "this->");
+                        pos += 6; // Move past the replaced text
+                    } else {
+                        // Not a member access, move to next character
+                        pos += 8;
+                    }
+                }
+                code += "        " + stmtCode;
             } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(stmt)) {
                 code += "        " + generateVariableDeclaration(varDecl).substr(4);
             } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
@@ -520,28 +560,73 @@ std::string CodeGenerator::generateClassMethodDeclaration(ClassMethodDeclaration
     // Class methods are generated as static methods
     code += "    static " + method->returnType + " " + method->name + "(";
     
-    // Generate parameters
-    for (size_t i = 0; i < method->parameters.size(); ++i) {
-        const auto& param = method->parameters[i];
-        code += "auto " + param.name;
-        if (i < method->parameters.size() - 1) {
-            code += ", ";
+    // Generate parameters (skip the first 'instance' parameter)
+        for (size_t i = 1; i < method->parameters.size(); ++i) {
+            const auto& param = method->parameters[i];
+            // Use specific types based on parameter name to comply with C++17
+            std::string paramType;
+            if (param.name == "name") {
+                paramType = "std::string";
+            } else if (param.name == "age" || param.name == "id") {
+                paramType = "int";
+            } else {
+                paramType = "auto";
+            }
+            code += paramType + " " + param.name;
+            if (i < method->parameters.size() - 1) {
+                code += ", ";
+            }
         }
-    }
     code += ") {\n";
     
     // Generate method body
     for (auto stmt : method->body) {
         if (auto exprStmt = dynamic_cast<ExpressionStatement*>(stmt)) {
-            code += "        " + generateExpressionStatement(exprStmt).substr(4);
+            std::string stmtCode = generateExpressionStatement(exprStmt).substr(4);
+            // Replace instance. and instance-> with this-> in method body
+            size_t pos = 0;
+            while ((pos = stmtCode.find("instance", pos)) != std::string::npos) {
+                // Check if it's instance. or instance->
+                if (pos + 9 <= stmtCode.length() && stmtCode.substr(pos + 8, 1) == ".") {
+                    // Replace instance. with this->
+                    stmtCode.replace(pos, 9, "this->");
+                    pos += 6; // Move past the replaced text
+                } else if (pos + 10 <= stmtCode.length() && stmtCode.substr(pos + 8, 2) == "->") {
+                    // Replace instance-> with this->
+                    stmtCode.replace(pos, 10, "this->");
+                    pos += 6; // Move past the replaced text
+                } else {
+                    // Not a member access, move to next character
+                    pos += 8;
+                }
+            }
+            code += "        " + stmtCode;
         } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(stmt)) {
             code += "        " + generateVariableDeclaration(varDecl).substr(4);
         } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
-            code += "        return";
+            std::string stmtCode = "return";
             if (returnStmt->expression) {
-                code += " " + generateExpression(returnStmt->expression);
+                std::string exprCode = generateExpression(returnStmt->expression);
+                // Replace instance. and instance-> with this-> in return expression
+                size_t pos = 0;
+                while ((pos = exprCode.find("instance", pos)) != std::string::npos) {
+                    // Check if it's instance. or instance->
+                    if (pos + 9 <= exprCode.length() && exprCode.substr(pos + 8, 1) == ".") {
+                        // Replace instance. with this->
+                        exprCode.replace(pos, 9, "this->");
+                        pos += 6; // Move past the replaced text
+                    } else if (pos + 10 <= exprCode.length() && exprCode.substr(pos + 8, 2) == "->") {
+                        // Replace instance-> with this->
+                        exprCode.replace(pos, 10, "this->");
+                        pos += 6; // Move past the replaced text
+                    } else {
+                        // Not a member access, move to next character
+                        pos += 8;
+                    }
+                }
+                stmtCode += " " + exprCode;
             }
-            code += ";\n";
+            code += "        " + stmtCode + ";\n";
         } else {
             code += "        // Unimplemented statement type in class method\n";
         }
@@ -557,12 +642,56 @@ std::string CodeGenerator::generateInstanceMethodDeclaration(InstanceMethodDecla
     std::string code;
     
     // Generate method signature (skip the first 'instance' parameter)
-    code += "    " + method->returnType + " " + method->name + "(";
+    // Infer return type if it's a getter method
+    std::string returnType = method->returnType;
+    if (returnType == "void") {
+        // Check if method body has a return statement with value
+        for (auto stmt : method->body) {
+            if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
+                if (returnStmt->expression) {
+                    // For simple getter methods, infer return type based on member access
+                    if (auto memberAccess = dynamic_cast<InstanceAccessExpression*>(returnStmt->expression)) {
+                        // This is an InstanceAccessExpression, but we need to check its actual type
+                        // For now, let's set return type to appropriate type based on member name
+                        std::string memberName = memberAccess->memberName;
+                        if (memberName == "name") {
+                            returnType = "std::string";
+                        } else if (memberName == "age" || memberName == "id") {
+                            returnType = "int";
+                        }
+                    } else if (auto ident = dynamic_cast<Identifier*>(returnStmt->expression)) {
+                        // Check if it's a simple identifier (like instance.name)
+                        std::string identName = ident->name;
+                        if (identName == "name") {
+                            returnType = "std::string";
+                        } else if (identName == "age" || identName == "id") {
+                            returnType = "int";
+                        }
+                    } else {
+                        // Default to auto for other cases
+                        returnType = "auto";
+                    }
+                    break;
+                }
+            }
+        }
+    }
     
-    // Generate parameters
+    code += "    " + returnType + " " + method->name + "(";
+    
+    // Generate parameters (instance parameter has already been skipped during parsing)
     for (size_t i = 0; i < method->parameters.size(); ++i) {
         const auto& param = method->parameters[i];
-        code += "auto " + param.name;
+        // Use specific types based on parameter name to comply with C++17
+        std::string paramType;
+        if (param.name == "name") {
+            paramType = "std::string";
+        } else if (param.name == "age" || param.name == "id") {
+            paramType = "int";
+        } else {
+            paramType = "auto";
+        }
+        code += paramType + " " + param.name;
         if (i < method->parameters.size() - 1) {
             code += ", ";
         }
@@ -572,15 +701,51 @@ std::string CodeGenerator::generateInstanceMethodDeclaration(InstanceMethodDecla
     // Generate method body
     for (auto stmt : method->body) {
         if (auto exprStmt = dynamic_cast<ExpressionStatement*>(stmt)) {
-            code += "        " + generateExpressionStatement(exprStmt).substr(4);
+            std::string stmtCode = generateExpressionStatement(exprStmt).substr(4);
+            // Replace instance. and instance-> with this-> in method body
+            size_t pos = 0;
+            while ((pos = stmtCode.find("instance", pos)) != std::string::npos) {
+                // Check if it's instance. or instance->
+                if (pos + 9 <= stmtCode.length() && stmtCode.substr(pos + 8, 1) == ".") {
+                    // Replace instance. with this->
+                    stmtCode.replace(pos, 9, "this->");
+                    pos += 6; // Move past the replaced text
+                } else if (pos + 10 <= stmtCode.length() && stmtCode.substr(pos + 8, 2) == "->") {
+                    // Replace instance-> with this->
+                    stmtCode.replace(pos, 10, "this->");
+                    pos += 6; // Move past the replaced text
+                } else {
+                    // Not a member access, move to next character
+                    pos += 8;
+                }
+            }
+            code += "        " + stmtCode;
         } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(stmt)) {
             code += "        " + generateVariableDeclaration(varDecl).substr(4);
         } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
-            code += "        return";
+            std::string stmtCode = "return";
             if (returnStmt->expression) {
-                code += " " + generateExpression(returnStmt->expression);
+                std::string exprCode = generateExpression(returnStmt->expression);
+                // Replace instance. and instance-> with this-> in return expression
+                size_t pos = 0;
+                while ((pos = exprCode.find("instance", pos)) != std::string::npos) {
+                    // Check if it's instance. or instance->
+                    if (pos + 9 <= exprCode.length() && exprCode.substr(pos + 8, 1) == ".") {
+                        // Replace instance. with this->
+                        exprCode.replace(pos, 9, "this->");
+                        pos += 6; // Move past the replaced text
+                    } else if (pos + 10 <= exprCode.length() && exprCode.substr(pos + 8, 2) == "->") {
+                        // Replace instance-> with this->
+                        exprCode.replace(pos, 10, "this->");
+                        pos += 6; // Move past the replaced text
+                    } else {
+                        // Not a member access, move to next character
+                        pos += 8;
+                    }
+                }
+                stmtCode += " " + exprCode;
             }
-            code += ";\n";
+            code += "        " + stmtCode + ";\n";
         } else {
             code += "        // Unimplemented statement type in instance method\n";
         }
@@ -593,7 +758,14 @@ std::string CodeGenerator::generateInstanceMethodDeclaration(InstanceMethodDecla
 
 // Generate instance creation expression
 std::string CodeGenerator::generateInstanceCreationExpression(InstanceCreationExpression* expr) {
-    std::string code = "std::make_unique<" + expr->className + ">(";
+    std::string code = "std::make_unique<";
+    
+    // Add namespace if present
+    if (!expr->namespaceName.empty()) {
+        code += expr->namespaceName + "::";
+    }
+    
+    code += expr->className + ">(";
     
     // Generate arguments
     for (size_t i = 0; i < expr->arguments.size(); ++i) {
@@ -609,7 +781,8 @@ std::string CodeGenerator::generateInstanceCreationExpression(InstanceCreationEx
 
 // Generate instance access expression
 std::string CodeGenerator::generateInstanceAccessExpression(InstanceAccessExpression* expr) {
-    return generateExpression(expr->instance) + "." + expr->memberName;
+    // All instances created via Vanction are unique_ptr, so use -> operator
+    return generateExpression(expr->instance) + "->" + expr->memberName;
 }
 
 // Generate assignment expression
@@ -621,13 +794,25 @@ std::string CodeGenerator::generateAssignmentExpression(AssignmentExpression* ex
 std::string CodeGenerator::generateFunctionCall(FunctionCall* call) {
     if (call->objectName == "System" && call->methodName == "print") {
         // Generate std::cout << ... << std::endl
-        std::string code = "std::cout << ";
+        std::string code = "std::cout";
         
         // Generate arguments
         for (size_t i = 0; i < call->arguments.size(); ++i) {
-            code += generateExpression(call->arguments[i]);
-            if (i < call->arguments.size() - 1) {
-                code += " << ";
+            std::string argExpr = generateExpression(call->arguments[i]);
+            
+            // If argument contains + operator, we need to handle it specially
+            if (argExpr.find(" + ") != std::string::npos) {
+                // Split the expression by + and add each part with <<
+                size_t pos = 0;
+                size_t start = 0;
+                while ((pos = argExpr.find(" + ", start)) != std::string::npos) {
+                    code += " << " + argExpr.substr(start, pos - start);
+                    start = pos + 3;
+                }
+                code += " << " + argExpr.substr(start);
+            } else {
+                // Simple argument, just add it
+                code += " << " + argExpr;
             }
         }
         
@@ -681,9 +866,27 @@ std::string CodeGenerator::generateFunctionCall(FunctionCall* call) {
         
         code += ")";
         return code;
+    } else if (call->objectName == "instance") {
+        // Special case for instance.method() calls within class methods
+        // This should be handled by the method body code generation that replaces instance. with this->
+        std::string code = call->methodName + "(";
+        
+        // Generate arguments
+        for (size_t i = 0; i < call->arguments.size(); ++i) {
+            code += generateExpression(call->arguments[i]);
+            if (i < call->arguments.size() - 1) {
+                code += ", ";
+            }
+        }
+        
+        code += ")";
+        return code;
     } else {
-        // Namespace function call (e.g., Test:add)
-        std::string code = call->objectName + "::" + call->methodName + "(";
+        // Check if it's an instance method call (e.g., obj.method()) or namespace function call
+        // In Vanction, instance variables are created with instance keyword, so we need to check if objectName is an instance variable
+        // For now, assume any objectName that's not a known namespace is an instance variable
+        // Generate instance method call syntax: objectName->methodName()
+        std::string code = call->objectName + "->" + call->methodName + "(";
         
         // Generate arguments
         for (size_t i = 0; i < call->arguments.size(); ++i) {

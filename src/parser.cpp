@@ -159,19 +159,12 @@ ClassDeclaration* Parser::parseClassDeclarationAST() {
                     // Create init method declaration
                     auto initMethod = new InstanceMethodDeclaration(name, "init", "void");
                     
-                    // Parse parameters (first parameter is instance)
-                    if ((currentToken.type == IDENTIFIER || currentToken.type == KEYWORD) && currentToken.value == "instance") {
-                        consume(currentToken.type);
-                        // Skip instance parameter
-            if (currentToken.type == COMMA) {
-                consume(COMMA);
-            }
-                    }
-                    
-                    // Parse additional parameters
-                    while (currentToken.type == IDENTIFIER) {
+                    // Parse parameters - include the instance parameter
+                    bool firstParam = true;
+                    while ((currentToken.type == IDENTIFIER || currentToken.type == KEYWORD) && 
+                           (currentToken.value == "instance" || currentToken.type == IDENTIFIER)) {
                         std::string paramName = currentToken.value;
-                        consume(IDENTIFIER);
+                        consume(currentToken.type);
                         initMethod->parameters.push_back(FunctionParameter(paramName));
                         
                         if (currentToken.type == COMMA) {
@@ -179,6 +172,7 @@ ClassDeclaration* Parser::parseClassDeclarationAST() {
                         } else {
                             break;
                         }
+                        firstParam = false;
                     }
                     
                     // Parse right parenthesis
@@ -201,26 +195,31 @@ ClassDeclaration* Parser::parseClassDeclarationAST() {
                     // Create instance method declaration
                     auto method = new InstanceMethodDeclaration(name, methodName, "void");
                     
-                    // Parse parameters (first parameter is instance)
-                    if ((currentToken.type == IDENTIFIER || currentToken.type == KEYWORD) && currentToken.value == "instance") {
-                        consume(currentToken.type);
-                        // Skip instance parameter
-            if (currentToken.type == COMMA) {
-                consume(COMMA);
-            }
-                    }
-                    
-                    // Parse additional parameters
-                    while (currentToken.type == IDENTIFIER) {
-                        std::string paramName = currentToken.value;
-                        consume(IDENTIFIER);
-                        method->parameters.push_back(FunctionParameter(paramName));
-                        
-                        if (currentToken.type == COMMA) {
-                            consume(COMMA);
+                    // Parse parameters
+                    bool firstParam = true;
+                    while (currentToken.type != RPAREN) {
+                        // Check if current token is a valid parameter name
+                        if (currentToken.type == IDENTIFIER || currentToken.type == KEYWORD) {
+                            std::string paramName = currentToken.value;
+                            consume(currentToken.type);
+                            
+                            // Add parameter to the list if it's not "instance"
+                            if (paramName != "instance") {
+                                method->parameters.push_back(FunctionParameter(paramName));
+                            }
+                            
+                            // Check if there's a comma after the parameter
+                            if (currentToken.type == COMMA) {
+                                consume(COMMA);
+                            } else if (currentToken.type != RPAREN) {
+                                // Invalid token, break the loop
+                                break;
+                            }
                         } else {
+                            // Invalid token, break the loop
                             break;
                         }
+                        firstParam = false;
                     }
                     
                     // Parse right parenthesis
@@ -1163,16 +1162,46 @@ Expression* Parser::parsePrimaryExpression() {
             
             // Check if it's a namespace:Class syntax
             if (currentToken.type == COLON) {
+                // Save the namespace name
+                std::string namespaceName = className;
+                
                 // Consume colon
                 currentToken = lexer->getNextToken();
                 
-                // Parse class name
+                // Parse actual class name
                 std::string actualClassName = currentToken.value;
                 consume(IDENTIFIER);
                 
-                // For now, we'll just use the actual class name
-                // In a full implementation, we'd look up the class in the namespace
-                className = actualClassName;
+                // Consume left parenthesis
+                consume(LPAREN);
+                
+                // Create instance creation expression with namespace
+                auto instanceExpr = new InstanceCreationExpression(actualClassName, namespaceName);
+                
+                // Parse arguments
+                if (currentToken.type != RPAREN) {
+                    auto arg = parseExpression();
+                    if (arg) {
+                        instanceExpr->arguments.push_back(arg);
+                    }
+                    
+                    // Parse additional arguments separated by commas
+                    while (currentToken.type == COMMA) {
+                        // Consume comma
+                        consume(COMMA);
+                        
+                        // Parse next argument
+                        arg = parseExpression();
+                        if (arg) {
+                            instanceExpr->arguments.push_back(arg);
+                        }
+                    }
+                }
+                
+                // Expect right parenthesis
+                consume(RPAREN);
+                
+                return instanceExpr;
             }
             
             // Parse arguments

@@ -7,12 +7,14 @@
 // Error type enumeration
 enum class ErrorType {
     CError,
+    MethodError,
     CompilationError,
     DivideByZeroError,
     ValueError,
     TokenError,
     SyntaxError,
-    MainFunctionError
+    MainFunctionError,
+    UnknownError
 };
 
 // Error class to represent an error with all relevant information

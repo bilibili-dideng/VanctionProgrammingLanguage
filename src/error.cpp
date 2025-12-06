@@ -32,12 +32,14 @@ int Error::getColumn() const {
 std::string Error::getTypeString() const {
     switch (type) {
         case ErrorType::CError: return "CError";
+        case ErrorType::MethodError: return "MethodError";
         case ErrorType::CompilationError: return "CompilationError";
         case ErrorType::DivideByZeroError: return "DivideByZeroError";
         case ErrorType::ValueError: return "ValueError";
         case ErrorType::TokenError: return "TokenError";
         case ErrorType::SyntaxError: return "SyntaxError";
         case ErrorType::MainFunctionError: return "MainFunctionError";
+        case ErrorType::UnknownError: return "UnknownError";
         default: return "UnknownError";
     }
 }
