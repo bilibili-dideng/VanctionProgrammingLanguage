@@ -1155,11 +1155,25 @@ Expression* Parser::parsePrimaryExpression() {
         // Consume the "instance" keyword
         currentToken = lexer->getNextToken();
         
-        // Check if it's an instance creation expression (e.g., instance ClassName())
+        // Check if it's an instance creation expression (e.g., instance ClassName() or instance Namespace:ClassName())
         if (currentToken.type == IDENTIFIER) {
             // It's an instance creation expression
             std::string className = currentToken.value;
             consume(IDENTIFIER);
+            
+            // Check if it's a namespace:Class syntax
+            if (currentToken.type == COLON) {
+                // Consume colon
+                currentToken = lexer->getNextToken();
+                
+                // Parse class name
+                std::string actualClassName = currentToken.value;
+                consume(IDENTIFIER);
+                
+                // For now, we'll just use the actual class name
+                // In a full implementation, we'd look up the class in the namespace
+                className = actualClassName;
+            }
             
             // Parse arguments
             consume(LPAREN);
