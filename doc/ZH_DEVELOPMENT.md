@@ -4,29 +4,7 @@
 
 Vanction 是一种简单的编译型编程语言，支持编译为可执行文件（通过 GCC）或直接解释执行。
 
-## 2. 目录结构
-
-```
-VanctionProgramLanguage/
-├── include/           # 头文件
-│   ├── ast.h          # AST 节点定义
-│   └── token.h        # 标记类型定义
-├── src/               # 源代码
-│   ├── code_generator.cpp  # C++ 代码生成器
-│   ├── code_generator.h    # 代码生成器头文件
-│   ├── lexer.cpp      # 词法分析器
-│   ├── lexer.h        # 词法分析器头文件
-│   ├── main.cpp       # 主程序入口
-│   ├── parser.cpp     # 语法分析器
-│   └── parser.h       # 语法分析器头文件
-├── examples/          # 示例程序
-│   ├── hello_world.vn # Hello World 示例
-│   └── variable_test.vn # 变量和输入输出示例
-├── build/             # 构建目录
-├── CMakeLists.txt     # CMake 构建配置
-├── DEVELOPMENT.md     # 开发文档
-└── README.md          # 使用文档
-```
+## 2. .
 
 ## 3. 核心组件
 

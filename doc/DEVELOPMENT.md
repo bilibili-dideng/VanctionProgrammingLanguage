@@ -4,29 +4,7 @@
 
 Vanction is a simple compiled programming language that supports compiling to executable files (via GCC) or direct interpretation.
 
-## 2. Directory Structure
-
-```
-VanctionProgramLanguage/
-├── include/           # Header files
-│   ├── ast.h          # AST node definitions
-│   └── token.h        # Token type definitions
-├── src/               # Source code
-│   ├── code_generator.cpp  # C++ code generator
-│   ├── code_generator.h    # Code generator header
-│   ├── lexer.cpp      # Lexical analyzer
-│   ├── lexer.h        # Lexical analyzer header
-│   ├── main.cpp       # Main program entry
-│   ├── parser.cpp     # Syntax analyzer
-│   └── parser.h       # Syntax analyzer header
-├── examples/          # Example programs
-│   ├── hello_world.vn # Hello World example
-│   └── variable_test.vn # Variable and I/O example
-├── build/             # Build directory
-├── CMakeLists.txt     # CMake build configuration
-├── DEVELOPMENT.md     # Development documentation
-└── README.md          # User documentation
-```
+## 2. .
 
 ## 3. Core Components
 
