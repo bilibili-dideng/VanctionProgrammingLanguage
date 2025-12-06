@@ -225,9 +225,10 @@ cmake --build .
 
 ## 10. Recently Implemented Features
 
-- **Return Statement Support**: Added support for `return` statements with optional expressions
+- **Return Statement Support**: Added support for `return` statements with optional expressions. In the `main` function, the return value is used as the program's exit code when running in interpreter mode.
 - **Custom Functions**: Implemented support for defining and calling custom functions
 - **Nested Functions**: Added support for defining functions within other functions
 - **Improved Error Handling**: Enhanced error messages with more accurate error types and contexts
 - **Debug Mode**: Added `-debug` parameter to enable detailed logging from lexer, parser, and code generator
 - **Auto Return Type**: Functions can now be defined without explicit return types (default to `auto`)
+- **Exit Code Support**: Main function return values are now properly handled as program exit codes in interpreter mode

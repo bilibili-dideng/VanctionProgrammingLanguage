@@ -138,23 +138,28 @@ std::map<std::string, Value> variables;
 std::map<std::string, FunctionDeclaration*> functions;
 
 // Forward declarations for execute functions
-void executeFunctionDeclaration(FunctionDeclaration* func);
-void executeStatement(ASTNode* stmt);
+Value executeFunctionDeclaration(FunctionDeclaration* func);
+Value executeStatement(ASTNode* stmt, bool* shouldReturn = nullptr);
 Value executeExpression(Expression* expr);
 Value executeFunctionCall(FunctionCall* call);
 
 // Execute program
-void executeProgram(Program* program) {
+Value executeProgram(Program* program) {
     // Execute all function declarations
     for (auto decl : program->declarations) {
         if (auto func = dynamic_cast<FunctionDeclaration*>(decl)) {
-            executeFunctionDeclaration(func);
+            Value result = executeFunctionDeclaration(func);
+            // If this is the main function, return its result
+            if (func->name == "main") {
+                return result;
+            }
         }
     }
+    return std::monostate{};
 }
 
 // Execute function declaration
-void executeFunctionDeclaration(FunctionDeclaration* func) {
+Value executeFunctionDeclaration(FunctionDeclaration* func) {
     // Store function in global function environment
     functions[func->name] = func;
     
@@ -162,19 +167,24 @@ void executeFunctionDeclaration(FunctionDeclaration* func) {
     if (func->name == "main") {
         // Execute function body
         for (auto stmt : func->body) {
-            executeStatement(stmt);
+            bool shouldReturn = false;
+            Value result = executeStatement(stmt, &shouldReturn);
+            if (shouldReturn) {
+                return result;
+            }
         }
     }
+    return std::monostate{};
 }
 
 // Execute statement
-void executeStatement(ASTNode* stmt) {
+Value executeStatement(ASTNode* stmt, bool* shouldReturn) {
     if (auto comment = dynamic_cast<Comment*>(stmt)) {
         // Skip comments
-        return;
+        return std::monostate{};
     } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(stmt)) {
         // Execute expression
-        executeExpression(exprStmt->expression);
+        return executeExpression(exprStmt->expression);
     } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(stmt)) {
         // Execute variable declaration
         if (varDecl->initializer) {
@@ -185,18 +195,23 @@ void executeStatement(ASTNode* stmt) {
             // Store default value (monostate for undefined)
             variables[varDecl->name] = std::monostate{};
         }
+        return std::monostate{};
     } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
         // Execute return expression if it exists
+        Value result = std::monostate{};
         if (returnStmt->expression) {
-            executeExpression(returnStmt->expression);
+            result = executeExpression(returnStmt->expression);
         }
-        // For now, we'll just return from the statement execution
-        // In the future, we'll need to handle function return values properly
-        return;
+        // Set return flag
+        if (shouldReturn) {
+            *shouldReturn = true;
+        }
+        return result;
     } else if (auto funcDecl = dynamic_cast<FunctionDeclaration*>(stmt)) {
         // Execute nested function declaration
-        executeFunctionDeclaration(funcDecl);
+        return executeFunctionDeclaration(funcDecl);
     }
+    return std::monostate{};
 }
 
 // Execute expression
@@ -868,7 +883,7 @@ int main(int argc, char* argv[]) {
             }
             
             // Execute the program
-            executeProgram(program);
+            Value result = executeProgram(program);
             
             if (debugMode) {
                 std::cout << "[DEBUG] Main: Program execution completed" << std::endl;
@@ -876,6 +891,20 @@ int main(int argc, char* argv[]) {
             
             // Clean up AST
             delete program;
+            
+            // Convert result to exit code
+            if (std::holds_alternative<int>(result)) {
+                return std::get<int>(result);
+            } else if (std::holds_alternative<bool>(result)) {
+                return std::get<bool>(result) ? 1 : 0;
+            } else if (std::holds_alternative<float>(result)) {
+                return static_cast<int>(std::get<float>(result));
+            } else if (std::holds_alternative<double>(result)) {
+                return static_cast<int>(std::get<double>(result));
+            }
+            
+            // Default exit code
+            return 0;
         }
     } catch (const std::runtime_error& e) {
         // Read file content again for error reporting

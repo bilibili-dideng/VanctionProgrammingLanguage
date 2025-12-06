@@ -35,8 +35,11 @@ Create a file named `hello_world.vn` with the following content:
 ```vanction
 func main() {
     System.print("Hello, Vanction!");
+    return 0;
 }
 ```
+
+The `return` statement in the `main` function will be used as the program's exit code when running in interpreter mode.
 
 ### 3.2 Running the Program
 
@@ -75,8 +78,11 @@ All programs must contain a `main` function as the entry point:
 ```vanction
 func main() {
     | Function body
+    return 0;
 }
 ```
+
+The `main` function can return an integer value, which will be used as the program's exit code when running in interpreter mode. If no return statement is provided, the program will exit with code 0 by default.
 
 ### 4.2 Variables
 
@@ -273,6 +279,24 @@ switch(num) {
     case 3 {
         System.print("Three");
     }
+}
+```
+
+#### 4.5.7 return Statement
+
+The `return` statement is used to exit a function and optionally return a value. In the `main` function, the return value is used as the program's exit code in interpreter mode.
+
+```vanction
+| return statement without expression
+return;
+
+| return statement with expression
+return expression;
+
+| Example in main function
+func main() {
+    System.print("Hello, Vanction!");
+    return 0;  // Exit with code 0
 }
 ```
 

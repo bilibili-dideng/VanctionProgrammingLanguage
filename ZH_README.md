@@ -35,8 +35,11 @@ cmake --build .
 ```vanction
 func main() {
     System.print("Hello, Vanction!");
+    return 0;
 }
 ```
+
+`main` 函数中的 `return` 语句在解释器模式下将作为程序的退出码。
 
 ### 3.2 运行程序
 
@@ -75,8 +78,11 @@ hello_world.exe
 ```vanction
 func main() {
     | 函数体
+    return 0;
 }
 ```
+
+`main` 函数可以返回一个整数值，在解释器模式下运行时，该值将作为程序的退出码。如果没有提供 return 语句，程序将默认以 0 退出。
 
 ### 4.2 变量
 
@@ -273,6 +279,24 @@ switch(num) {
     case 3 {
         System.print("Three");
     }
+}
+```
+
+#### 4.5.7 return 语句
+
+`return` 语句用于退出函数并可选地返回一个值。在 `main` 函数中，返回值在解释器模式下用作程序的退出码。
+
+```vanction
+| 不带表达式的 return 语句
+return;
+
+| 带表达式的 return 语句
+return 表达式;
+
+| main 函数中的示例
+func main() {
+    System.print("Hello, Vanction!");
+    return 0;  // 以 0 退出
 }
 ```
 
@@ -509,17 +533,17 @@ VanctionProgramLanguage/
 
 **重要提示：** 编译模式需要安装 mingw64。确保 `mingw64` 目录与 `vanction.exe` 处于同一目录，或者已在系统 PATH 中正确配置。
 
-## 11. 许可证
+## 12. 许可证
 
 本项目采用 LGPL2.0 许可证。
 
-## 12. 贡献
+## 13. 贡献
 
 欢迎提交 Issues 和 Pull Requests！
 
-## 13. 联系方式
+## 14. 联系方式
 
 如有问题或建议，请通过以下方式联系：
 
-- 项目地址：[VanctionProgramLanguage](https://github.com/bilibili-dideng/VanctionProgramLanguage)
+- 项目地址：[VanctionProgramLanguage](https://github.com/bilibili-dideng/VanctionProgrammingLanguage)
 - 邮箱：3483434955@qq.com`
