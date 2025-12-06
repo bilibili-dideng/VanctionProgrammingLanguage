@@ -12,6 +12,7 @@ set(SOURCE_FILES
     src/parser.cpp
     src/main.cpp
     src/code_generator.cpp
+    src/error.cpp
 )
 
 # 添加可执行文件

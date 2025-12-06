@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "code_generator.h"
+#include "error.h"
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -8,6 +9,7 @@
 #include <map>
 #include <variant>
 #include <any>
+#include <stdexcept>
 
 // Read file content
 std::string readFile(const std::string& filePath) {
@@ -176,7 +178,7 @@ Value executeExpression(Expression* expr) {
             } else if (std::holds_alternative<double>(val)) {
                 return std::get<double>(val);
             } else {
-                return 0.0;
+                throw std::runtime_error("Cannot convert to number");
             }
         };
         
@@ -191,6 +193,10 @@ Value executeExpression(Expression* expr) {
         } else if (binaryExpr->op == "*") {
             result = leftNum * rightNum;
         } else if (binaryExpr->op == "/") {
+            // Check for division by zero
+            if (rightNum == 0.0) {
+                throw std::runtime_error("Division by zero");
+            }
             result = leftNum / rightNum;
         } else if (binaryExpr->op == "<<") {
             // Bit shift operations - cast to int
@@ -306,7 +312,7 @@ Value executeFunctionCall(FunctionCall* call) {
                 try {
                     return std::stoi(std::get<std::string>(arg));
                 } catch (...) {
-                    return 0;
+                    throw std::runtime_error("Cannot convert string to int");
                 }
             }
         } else if (call->methodName == "float") {
@@ -324,7 +330,7 @@ Value executeFunctionCall(FunctionCall* call) {
                 try {
                     return std::stof(std::get<std::string>(arg));
                 } catch (...) {
-                    return 0.0f;
+                    throw std::runtime_error("Cannot convert string to float");
                 }
             }
         } else if (call->methodName == "double") {
@@ -342,7 +348,7 @@ Value executeFunctionCall(FunctionCall* call) {
                 try {
                     return std::stod(std::get<std::string>(arg));
                 } catch (...) {
-                    return 0.0;
+                    throw std::runtime_error("Cannot convert string to double");
                 }
             }
         } else if (call->methodName == "string") {
@@ -442,72 +448,146 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    // Read file content
-    std::string sourceCode = readFile(filePath);
-    
-    // Create lexer
-    Lexer lexer(sourceCode);
-    
-    // Create parser
-    Parser parser(lexer);
-    
-    if (mode == "-g") {
-        // GCC compile mode: generate AST, then compile to executable
-        std::cout << "Entering GCC compile mode..." << std::endl;
+    try {
+        // Read file content
+        std::string sourceCode = readFile(filePath);
         
-        // Generate AST
-        auto program = parser.parseProgramAST();
-        if (!program) {
-            std::cerr << "Error: AST generation failed" << std::endl;
-            return 1;
+        // Create error reporter
+        ErrorReporter errorReporter(sourceCode, filePath);
+        
+        // Create lexer
+        Lexer lexer(sourceCode);
+        
+        // Create parser
+        Parser parser(lexer);
+        
+        if (mode == "-g") {
+            // GCC compile mode: generate AST, then compile to executable
+            std::cout << "Entering GCC compile mode..." << std::endl;
+            
+            // Generate AST
+            auto program = parser.parseProgramAST();
+            if (!program) {
+                throw std::runtime_error("AST generation failed");
+            }
+            
+            // Check if main function exists
+            bool hasMainFunction = false;
+            for (auto decl : program->declarations) {
+                if (auto func = dynamic_cast<FunctionDeclaration*>(decl)) {
+                    if (func->name == "main") {
+                        hasMainFunction = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!hasMainFunction) {
+                Error error(ErrorType::MainFunctionError, "Program must have a main function", filePath, 1, 1);
+                errorReporter.report(error);
+                delete program;
+                return 1;
+            }
+            
+            // Generate C++ code
+            CodeGenerator codeGen;
+            std::string cppCode = codeGen.generate(program);
+            
+            // Save generated C++ code
+            std::string cppFile = getFileNameWithoutExt(filePath) + ".cpp";
+            writeFile(cppFile, cppCode);
+            std::cout << "Generated C++ code: " << cppFile << std::endl;
+            
+            // Set default output filename
+            if (outputFile.empty()) {
+                outputFile = getFileNameWithoutExt(filePath) + ".exe";
+            }
+            
+            // Call external compiler
+            std::cout << "Compiling to executable: " << outputFile << std::endl;
+            int result = compileWithGCC(cppFile, outputFile);
+            
+            if (result == 0) {
+                std::cout << "GCC compilation successful!" << std::endl;
+            } else {
+                Error error(ErrorType::CompilationError, "GCC compilation failed", filePath, 1, 1);
+                errorReporter.report(error);
+                std::remove(cppFile.c_str());
+                delete program;
+                return 1;
+            }
+            
+            // Clean up temporary file
+            std::remove(cppFile.c_str());
+            std::cout << "Cleaned up temporary files" << std::endl;
+            
+            // Clean up AST
+            delete program;
+        } else if (mode == "-i") {
+            // Interpret mode: generate AST and execute
+            
+            // Generate AST
+            auto program = parser.parseProgramAST();
+            if (!program) {
+                throw std::runtime_error("AST generation failed");
+            }
+            
+            // Check if main function exists
+            bool hasMainFunction = false;
+            for (auto decl : program->declarations) {
+                if (auto func = dynamic_cast<FunctionDeclaration*>(decl)) {
+                    if (func->name == "main") {
+                        hasMainFunction = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!hasMainFunction) {
+                Error error(ErrorType::MainFunctionError, "Program must have a main function", filePath, 1, 1);
+                errorReporter.report(error);
+                delete program;
+                return 1;
+            }
+            
+            // Execute the program
+            executeProgram(program);
+            
+            // Clean up AST
+            delete program;
+        }
+    } catch (const std::runtime_error& e) {
+        // Read file content again for error reporting
+        std::string sourceCode = readFile(filePath);
+        ErrorReporter errorReporter(sourceCode, filePath);
+        
+        // Determine error type based on error message
+        std::string errorMsg = e.what();
+        ErrorType errorType = ErrorType::CError;
+        
+        if (errorMsg.find("Syntax error") != std::string::npos) {
+            errorType = ErrorType::SyntaxError;
+        } else if (errorMsg.find("Unknown character") != std::string::npos) {
+            errorType = ErrorType::TokenError;
+        } else if (errorMsg.find("Division by zero") != std::string::npos) {
+            errorType = ErrorType::DivideByZeroError;
+        } else if (errorMsg.find("Cannot convert") != std::string::npos) {
+            errorType = ErrorType::ValueError;
+        } else if (errorMsg.find("Main function") != std::string::npos) {
+            errorType = ErrorType::MainFunctionError;
         }
         
-        // Generate C++ code
-        CodeGenerator codeGen;
-        std::string cppCode = codeGen.generate(program);
-        
-        // Save generated C++ code
-        std::string cppFile = getFileNameWithoutExt(filePath) + ".cpp";
-        writeFile(cppFile, cppCode);
-        std::cout << "Generated C++ code: " << cppFile << std::endl;
-        
-        // Set default output filename
-        if (outputFile.empty()) {
-            outputFile = getFileNameWithoutExt(filePath) + ".exe";
-        }
-        
-        // Call external compiler
-        std::cout << "Compiling to executable: " << outputFile << std::endl;
-        int result = compileWithGCC(cppFile, outputFile);
-        
-        if (result == 0) {
-            std::cout << "GCC compilation successful!" << std::endl;
-        } else {
-            std::cerr << "GCC compilation failed!" << std::endl;
-            return 1;
-        }
-        
-        // Clean up temporary file
-        std::remove(cppFile.c_str());
-        std::cout << "Cleaned up temporary files" << std::endl;
-        
-        // Clean up AST
-        delete program;
-    } else if (mode == "-i") {
-        // Interpret mode: generate AST and execute
-        
-        // Generate AST
-        auto program = parser.parseProgramAST();
-        if (!program) {
-            std::cerr << "Error: AST generation failed" << std::endl;
-            return 1;
-        }
-        
-        // Execute the program
-        executeProgram(program);
-        
-        // Clean up AST
-        delete program;
+        // Create and report error
+        Error error(errorType, errorMsg, filePath, 1, 1);
+        errorReporter.report(error);
+        return 1;
+    } catch (const std::exception& e) {
+        // Handle other exceptions as CError
+        std::string sourceCode = readFile(filePath);
+        ErrorReporter errorReporter(sourceCode, filePath);
+        Error error(ErrorType::CError, e.what(), filePath, 1, 1);
+        errorReporter.report(error);
+        return 1;
     }
     
     return 0;

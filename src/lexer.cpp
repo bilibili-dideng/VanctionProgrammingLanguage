@@ -1,5 +1,6 @@
 #include "lexer.h"
 #include <cctype>
+#include <stdexcept>
 
 // Constructor
 Lexer::Lexer(const std::string& source) {
@@ -225,6 +226,17 @@ Token Lexer::getNextToken() {
         return parseCharLiteral();
     }
     
+    // Check for comma
+    if (current == ',') {
+        advance();
+        Token token;
+        token.type = IDENTIFIER;
+        token.value = ",";
+        token.line = line;
+        token.column = column - 1;
+        return token;
+    }
+    
     // Check for number literal (integer, float, or double)
     if (isdigit(current)) {
         return parseNumberLiteral();
@@ -236,13 +248,13 @@ Token Lexer::getNextToken() {
     }
     
     // Unknown character
+    char unknownChar = current;
+    int unknownLine = line;
+    int unknownColumn = column;
     advance();
-    Token token;
-    token.type = IDENTIFIER;
-    token.value = std::string(1, current);
-    token.line = line;
-    token.column = column - 1;
-    return token;
+    
+    std::string errorMessage = "Unknown character '" + std::string(1, unknownChar) + "'";
+    throw std::runtime_error(errorMessage);
 }
 
 // Advance one character

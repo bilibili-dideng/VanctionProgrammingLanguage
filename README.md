@@ -322,7 +322,40 @@ System.print("Hello, " + name + "!");
 string input = System.input("");
 ```
 
-## 5. Command Line Options
+## 5. Error Handling
+
+Vanction has a comprehensive error handling system that provides clear and formatted error messages. When an error occurs, the interpreter/compiler will display:
+
+- A blue header "error occurred to:"
+- The purple absolute file path
+- Three purple lines of code around the error
+- A red error indicator `^^^^^^^` pointing to the error
+- The purple error type and message
+
+### 5.1 Error Types
+
+| Error Type | Description |
+|------------|-------------|
+| `CError` | C++ errors during compilation or execution |
+| `CompilationError` | Errors from the external compiler (GCC) |
+| `DivideByZeroError` | Division by zero errors |
+| `ValueError` | Type conversion errors (e.g., converting string "abc" to int) |
+| `TokenError` | Unknown token errors |
+| `SyntaxError` | Syntax errors |
+| `MainFunctionError` | Missing main function |
+
+### 5.2 Error Message Example
+
+```
+error occurred to:
+    C:\Users\Administrator\CLionProjects\VanctionProgramLanguage\test_error.vn
+    func main() {
+        int a = 10 / 0;
+    ^^^^^^^
+DivideByZeroError: Division by zero
+```
+
+## 6. Command Line Options
 
 | Option | Description |
 |--------|-------------|
@@ -331,7 +364,7 @@ string input = System.input("");
 | `-o <output.exe>` | Specify output executable filename for compilation |
 | `-h, --help` | Show help information |
 
-### 5.1 Examples
+### 6.1 Examples
 
 ```powershell
 // Interpret execution
@@ -344,9 +377,9 @@ vanction.exe -g examples/hello_world.vn
 vanction.exe -g examples/hello_world.vn -o hello.exe
 ```
 
-## 6. Sample Programs
+## 7. Sample Programs
 
-### 6.1 Variable and Input/Output Example
+### 7.1 Variable and Input/Output Example
 
 ```vanction
 func main() {
@@ -409,7 +442,7 @@ func main() {
 }
 ```
 
-## 7. Notes
+## 8. Notes
 
 1. All statements must end with a semicolon `;`
 2. String literals are enclosed in double quotes `""`
@@ -418,7 +451,7 @@ func main() {
 5. Compilation mode requires built-in GCC support, ensure the `mingw64` directory is in the same directory as `vanction.exe`
 6. Variable names can only contain letters and numbers, and cannot start with a number
 
-## 8. Known Limitations
+## 9. Known Limitations
 
 1. Does not support custom functions
 2. Does not support arrays and structures
@@ -426,44 +459,54 @@ func main() {
 4. String operations only support `+` concatenation operator
 5. for-in loops only support string iteration
 
-## 9. Future Plans
+## 10. Future Plans
 
 - Support custom functions
 - Support arrays and structures
 - Support multi-line comments
 - Add more system functions
-- Optimize error messages
 - Expand for-in loop support to other collection types
 
-## 10. Project Structure
+## 11. Project Structure
 
 ```
 VanctionProgramLanguage/
-├── .idea/              | IDE configuration files
-├── .trae/              | Trae IDE configuration
-├── build/              | Build output directory
-├── doc/                | Documentation directory
-├── examples/           | Example programs
-├── include/            | Header files
-├── src/                | Source code
-├── .gitignore          | Git ignore configuration
-├── CMakeLists.txt      | CMake configuration
-├── LICENSE             | Project license (LGPL2.0)
-├── README.md           | Project documentation (English)
-└── ZH_README.md        | Project documentation (Chinese)
+├── bin/                 | Binary output directory
+├── CMakeLists.txt       | CMake configuration file
+├── doc/                 | Documentation directory
+│   ├── DEVELOPMENT.md   | Development documentation (English)
+│   └── ZH_DEVELOPMENT.md| Development documentation (Chinese)
+├── examples/            | Example programs
+│   └── hello_world.vn   | Hello World example
+├── include/             | Public header files
+│   ├── ast.h            | Abstract Syntax Tree definitions
+│   └── token.h          | Token definitions
+├── LICENSE              | LGPL2.0 license file
+├── README.md            | Project documentation (English)
+├── src/                 | Source code
+│   ├── code_generator.cpp | Code generation implementation
+│   ├── code_generator.h   | Code generation header
+│   ├── error.cpp          | Error handling implementation
+│   ├── error.h            | Error handling header
+│   ├── lexer.cpp          | Lexical analyzer implementation
+│   ├── lexer.h            | Lexical analyzer header
+│   ├── main.cpp           | Main program entry
+│   ├── parser.cpp         | Parser implementation
+│   └── parser.h           | Parser header
+└── ZH_README.md         | Project documentation (Chinese)
 ```
 
 **Important Note:** Compilation mode requires mingw64 to be installed. Ensure the `mingw64` directory is in the same directory as `vanction.exe` or properly configured in your system PATH.
 
-## 11. License
+## 12. License
 
 This project is licensed under the LGPL2.0 License.
 
-## 12. Contributions
+## 13. Contributions
 
 Issues and Pull Requests are welcome!
 
-## 13. Contact
+## 14. Contact
 
 For questions or suggestions, please contact:
 

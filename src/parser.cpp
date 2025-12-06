@@ -1,6 +1,7 @@
 #include "parser.h"
 #include <iostream>
 #include <cstdlib>
+#include <stdexcept>
 
 // Constructor
 Parser::Parser(Lexer& lexer) {
@@ -41,8 +42,8 @@ void Parser::consume(TokenType expectedType) {
     if (currentToken.type == expectedType) {
         currentToken = lexer->getNextToken();
     } else {
-        std::cerr << "Syntax error: expected " << tokenTypeToString(expectedType) << ", but got " << tokenTypeToString(currentToken.type) << " at line " << currentToken.line << " column " << currentToken.column << std::endl;
-        exit(1);
+        std::string errorMessage = "expected " + tokenTypeToString(expectedType) + ", but got " + tokenTypeToString(currentToken.type) + " at line " + std::to_string(currentToken.line) + " column " + std::to_string(currentToken.column);
+        throw std::runtime_error(errorMessage);
     }
 }
 
@@ -50,15 +51,13 @@ void Parser::consume(TokenType expectedType) {
 bool Parser::parseFunction() {
     // Check if it's func keyword
     if (currentToken.type != KEYWORD || currentToken.value != "func") {
-        std::cerr << "Syntax error: Function definition must start with 'func' keyword" << std::endl;
-        return false;
+        throw std::runtime_error("Function definition must start with 'func' keyword");
     }
     consume(KEYWORD);
     
     // Parse function name
     if (currentToken.type != IDENTIFIER) {
-        std::cerr << "Syntax error: Function name must be an identifier" << std::endl;
-        return false;
+        throw std::runtime_error("Function name must be an identifier");
     }
     functionName = currentToken.value;
     consume(IDENTIFIER);
@@ -85,15 +84,13 @@ bool Parser::parseFunction() {
 FunctionDeclaration* Parser::parseFunctionAST() {
     // Check if it's func keyword
     if (currentToken.type != KEYWORD || currentToken.value != "func") {
-        std::cerr << "Syntax error: Function definition must start with 'func' keyword" << std::endl;
-        return nullptr;
+        throw std::runtime_error("Syntax error: Function definition must start with 'func' keyword");
     }
     consume(KEYWORD);
     
     // Parse function name
     if (currentToken.type != IDENTIFIER) {
-        std::cerr << "Syntax error: Function name must be an identifier" << std::endl;
-        return nullptr;
+        throw std::runtime_error("Syntax error: Function name must be an identifier");
     }
     std::string funcName = currentToken.value;
     consume(IDENTIFIER);
@@ -515,8 +512,7 @@ Statement* Parser::parseStatement() {
                 } else {
                     // It's a variable declaration with type
                     // This is not supported yet, but we'll handle it gracefully
-                    std::cerr << "Syntax error: Expected assignment operator after identifier in for loop initialization" << std::endl;
-                    exit(1);
+                    throw std::runtime_error("Expected assignment operator after identifier in for loop initialization");
                 }
             }
         } else {
@@ -634,8 +630,7 @@ Expression* Parser::parseAssignmentExpression() {
         if (auto ident = dynamic_cast<Identifier*>(left)) {
             return new AssignmentExpression(ident, right);
         } else {
-            std::cerr << "Syntax error: left side of assignment must be an identifier" << std::endl;
-            exit(1);
+            throw std::runtime_error("left side of assignment must be an identifier");
         }
     }
     
@@ -801,6 +796,18 @@ Expression* Parser::parsePrimaryExpression() {
                 if (arg) {
                     call->arguments.push_back(arg);
                 }
+                
+                // Parse additional arguments separated by commas
+                while (currentToken.type == IDENTIFIER && currentToken.value == ",") {
+                    // Consume comma
+                    currentToken = lexer->getNextToken();
+                    
+                    // Parse next argument
+                    arg = parseExpression();
+                    if (arg) {
+                        call->arguments.push_back(arg);
+                    }
+                }
             }
             
             // Expect right parenthesis
@@ -844,14 +851,14 @@ Expression* Parser::parsePrimaryExpression() {
             return parseBooleanLiteral();
         } else if (currentToken.value == "AND" || currentToken.value == "OR" || currentToken.value == "XOR") {
             // Logical operators are handled in binary expression parsing
-            std::cerr << "Syntax error: Unexpected logical operator at line " << currentToken.line << " column " << currentToken.column << std::endl;
-            exit(1);
+            std::string errorMessage = "Unexpected logical operator at line " + std::to_string(currentToken.line) + " column " + std::to_string(currentToken.column);
+            throw std::runtime_error(errorMessage);
         }
     }
     
     // Unexpected token
-    std::cerr << "Syntax error: Unexpected token at line " << currentToken.line << " column " << currentToken.column << std::endl;
-    exit(1);
+    std::string errorMessage = "Unexpected token at line " + std::to_string(currentToken.line) + " column " + std::to_string(currentToken.column);
+    throw std::runtime_error(errorMessage);
 }
 
 // Parse string literal
@@ -929,6 +936,18 @@ Expression* Parser::parseFunctionCall() {
         auto arg = parseExpression();
         if (arg) {
             call->arguments.push_back(arg);
+        }
+        
+        // Parse additional arguments separated by commas
+        while (currentToken.type == IDENTIFIER && currentToken.value == ",") {
+            // Consume comma
+            consume(IDENTIFIER);
+            
+            // Parse next argument
+            arg = parseExpression();
+            if (arg) {
+                call->arguments.push_back(arg);
+            }
         }
     }
     

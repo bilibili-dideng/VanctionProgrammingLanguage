@@ -322,7 +322,40 @@ System.print("你好，" + name + "!");
 string input = System.input("");
 ```
 
-## 5. 命令行选项
+## 5. 错误处理
+
+Vanction 拥有完善的错误处理系统，提供清晰格式化的错误信息。当错误发生时，解释器/编译器将显示：
+
+- 蓝色标题 "error occurred to:"
+- 紫色的绝对文件路径
+- 错误周围三行紫色的代码
+- 红色的错误指示器 `^^^^^^^` 指向错误位置
+- 紫色的错误类型和错误信息
+
+### 5.1 错误类型
+
+| 错误类型 | 描述 |
+|----------|------|
+| `CError` | 编译或执行过程中的 C++ 错误 |
+| `CompilationError` | 外部编译器 (GCC) 错误 |
+| `DivideByZeroError` | 除零错误 |
+| `ValueError` | 类型转换错误（例如将字符串 "abc" 转换为整数） |
+| `TokenError` | 未知标记错误 |
+| `SyntaxError` | 语法错误 |
+| `MainFunctionError` | 缺少主函数 |
+
+### 5.2 错误信息示例
+
+```
+error occurred to:
+    C:\Users\Administrator\CLionProjects\VanctionProgramLanguage\test_error.vn
+    func main() {
+        int a = 10 / 0;
+    ^^^^^^^
+DivideByZeroError: Division by zero
+```
+
+## 6. 命令行选项
 
 | 选项 | 描述 |
 |------|------|
@@ -331,7 +364,7 @@ string input = System.input("");
 | `-o <output.exe>` | 指定编译输出的可执行文件名 |
 | `-h, --help` | 显示帮助信息 |
 
-### 5.1 示例
+### 6.1 示例
 
 ```powershell
 // 解释执行
@@ -344,9 +377,9 @@ vanction.exe -g examples/hello_world.vn
 vanction.exe -g examples/hello_world.vn -o hello.exe
 ```
 
-## 6. 示例程序
+## 7. 示例程序
 
-### 6.1 变量和输入输出示例
+### 7.1 变量和输入输出示例
 
 ```vanction
 func main() {
@@ -409,7 +442,7 @@ func main() {
 }
 ```
 
-## 7. 注意事项
+## 8. 注意事项
 
 1. 所有语句必须以分号 `;` 结尾
 2. 字符串字面量使用双引号 `""` 包裹
@@ -418,7 +451,7 @@ func main() {
 5. 编译模式需要内置的 GCC 支持，确保 `mingw64` 目录与 `vanction.exe` 处于同一目录
 6. 变量名只能包含字母和数字，且不能以数字开头
 
-## 8. 已知限制
+## 9. 已知限制
 
 1. 不支持自定义函数
 2. 不支持数组和结构体
@@ -426,31 +459,41 @@ func main() {
 4. 字符串操作仅支持 `+` 拼接运算符
 5. for-in 循环仅支持字符串迭代
 
-## 9. 未来计划
+## 10. 未来计划
 
 - 支持自定义函数
 - 支持数组和结构体
 - 支持多行注释
 - 添加更多系统函数
-- 优化错误提示
 - 扩展 for-in 循环支持到其他集合类型
 
-## 10. 项目结构
+## 11. 项目结构
 
 ```
 VanctionProgramLanguage/
-├── .idea/              | IDE配置文件
-├── .trae/              | Trae IDE配置
-├── build/              | 构建输出目录
-├── doc/                | 文档目录
-├── examples/           | 示例程序
-├── include/            | 头文件
-├── src/                | 源代码
-├── .gitignore          | Git忽略配置
-├── CMakeLists.txt      | CMake配置
-├── LICENSE             | 项目许可证 (LGPL2.0)
-├── README.md           | 项目说明文档 (英文)
-└── ZH_README.md        | 项目说明文档 (中文)
+├── bin/                 | 二进制输出目录
+├── CMakeLists.txt       | CMake 配置文件
+├── doc/                 | 文档目录
+│   ├── DEVELOPMENT.md   | 开发文档 (英文)
+│   └── ZH_DEVELOPMENT.md| 开发文档 (中文)
+├── examples/            | 示例程序
+│   └── hello_world.vn   | Hello World 示例
+├── include/             | 公共头文件
+│   ├── ast.h            | 抽象语法树定义
+│   └── token.h          | 标记定义
+├── LICENSE              | LGPL2.0 许可证文件
+├── README.md            | 项目文档 (英文)
+├── src/                 | 源代码
+│   ├── code_generator.cpp | 代码生成实现
+│   ├── code_generator.h   | 代码生成头文件
+│   ├── error.cpp          | 错误处理实现
+│   ├── error.h            | 错误处理头文件
+│   ├── lexer.cpp          | 词法分析器实现
+│   ├── lexer.h            | 词法分析器头文件
+│   ├── main.cpp           | 主程序入口
+│   ├── parser.cpp         | 解析器实现
+│   └── parser.h           | 解析器头文件
+└── ZH_README.md         | 项目文档 (中文)
 ```
 
 **重要提示：** 编译模式需要安装 mingw64。确保 `mingw64` 目录与 `vanction.exe` 处于同一目录，或者已在系统 PATH 中正确配置。
