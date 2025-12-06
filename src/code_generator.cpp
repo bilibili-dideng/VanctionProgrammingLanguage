@@ -38,6 +38,18 @@ std::string CodeGenerator::generateFunctionDeclaration(FunctionDeclaration* func
             code += generateExpressionStatement(exprStmt);
         } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(stmt)) {
             code += generateVariableDeclaration(varDecl);
+        } else if (auto ifStmt = dynamic_cast<IfStatement*>(stmt)) {
+            code += generateIfStatement(ifStmt);
+        } else if (auto forStmt = dynamic_cast<ForLoopStatement*>(stmt)) {
+            code += generateForLoopStatement(forStmt);
+        } else if (auto forInStmt = dynamic_cast<ForInLoopStatement*>(stmt)) {
+            code += generateForInLoopStatement(forInStmt);
+        } else if (auto whileStmt = dynamic_cast<WhileLoopStatement*>(stmt)) {
+            code += generateWhileLoopStatement(whileStmt);
+        } else if (auto doWhileStmt = dynamic_cast<DoWhileLoopStatement*>(stmt)) {
+            code += generateDoWhileLoopStatement(doWhileStmt);
+        } else if (auto switchStmt = dynamic_cast<SwitchStatement*>(stmt)) {
+            code += generateSwitchStatement(switchStmt);
         } else {
             code += "    // Unimplemented statement type\n";
         }
@@ -186,9 +198,196 @@ std::string CodeGenerator::generateBinaryExpression(BinaryExpression* expr) {
         return left + " || " + right;
     } else if (op == "XOR") {
         return left + " ^ " + right;
+    } else if (op == "==") {
+        return left + " == " + right;
+    } else if (op == "!=") {
+        return left + " != " + right;
+    } else if (op == "<") {
+        return left + " < " + right;
+    } else if (op == "<=") {
+        return left + " <= " + right;
+    } else if (op == ">") {
+        return left + " > " + right;
+    } else if (op == ">=") {
+        return left + " >= " + right;
     }
     
     return left + " " + op + " " + right;
+}
+
+// Generate if statement
+std::string CodeGenerator::generateIfStatement(IfStatement* stmt) {
+    std::string code = "    if (" + generateExpression(stmt->condition) + ") {\n";
+    
+    // Generate if body
+    for (auto bodyStmt : stmt->ifBody) {
+        if (auto comment = dynamic_cast<Comment*>(bodyStmt)) {
+            code += generateComment(comment);
+        } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(bodyStmt)) {
+            code += generateExpressionStatement(exprStmt);
+        } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(bodyStmt)) {
+            code += generateVariableDeclaration(varDecl);
+        }
+    }
+    
+    code += "    }";
+    
+    // Generate else-if clauses
+    for (auto elseIf : stmt->elseIfs) {
+        code += " else if (" + generateExpression(elseIf->condition) + ") {\n";
+        
+        // Generate else-if body
+        for (auto bodyStmt : elseIf->ifBody) {
+            if (auto comment = dynamic_cast<Comment*>(bodyStmt)) {
+                code += generateComment(comment);
+            } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(bodyStmt)) {
+                code += generateExpressionStatement(exprStmt);
+            } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(bodyStmt)) {
+                code += generateVariableDeclaration(varDecl);
+            }
+        }
+        
+        code += "    }";
+    }
+    
+    // Generate else clause
+    if (!stmt->elseBody.empty()) {
+        code += " else {\n";
+        
+        // Generate else body
+        for (auto bodyStmt : stmt->elseBody) {
+            if (auto comment = dynamic_cast<Comment*>(bodyStmt)) {
+                code += generateComment(comment);
+            } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(bodyStmt)) {
+                code += generateExpressionStatement(exprStmt);
+            } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(bodyStmt)) {
+                code += generateVariableDeclaration(varDecl);
+            }
+        }
+        
+        code += "    }";
+    }
+    
+    code += "\n";
+    return code;
+}
+
+// Generate for loop statement
+std::string CodeGenerator::generateForLoopStatement(ForLoopStatement* stmt) {
+    std::string code = "    for (";
+    
+    // Generate initialization
+    if (auto varDecl = dynamic_cast<VariableDeclaration*>(stmt->initialization)) {
+        code += generateVariableDeclaration(varDecl).substr(4); // Remove indentation
+        code.pop_back(); // Remove newline
+    } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(stmt->initialization)) {
+        code += generateExpression(exprStmt->expression);
+    }
+    
+    code += "; " + generateExpression(stmt->condition) + "; " + generateExpression(stmt->increment) + ") {\n";
+    
+    // Generate loop body
+    for (auto bodyStmt : stmt->body) {
+        if (auto comment = dynamic_cast<Comment*>(bodyStmt)) {
+            code += generateComment(comment);
+        } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(bodyStmt)) {
+            code += generateExpressionStatement(exprStmt);
+        } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(bodyStmt)) {
+            code += generateVariableDeclaration(varDecl);
+        }
+    }
+    
+    code += "    }\n";
+    return code;
+}
+
+// Generate for-in loop statement
+std::string CodeGenerator::generateForInLoopStatement(ForInLoopStatement* stmt) {
+    std::string code = "    for (char " + stmt->variableName + " : " + generateExpression(stmt->collection) + ") {\n";
+    
+    // Generate loop body
+    for (auto bodyStmt : stmt->body) {
+        if (auto comment = dynamic_cast<Comment*>(bodyStmt)) {
+            code += generateComment(comment);
+        } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(bodyStmt)) {
+            code += generateExpressionStatement(exprStmt);
+        } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(bodyStmt)) {
+            code += generateVariableDeclaration(varDecl);
+        }
+    }
+    
+    code += "    }\n";
+    return code;
+}
+
+// Generate while loop statement
+std::string CodeGenerator::generateWhileLoopStatement(WhileLoopStatement* stmt) {
+    std::string code = "    while (" + generateExpression(stmt->condition) + ") {\n";
+    
+    // Generate loop body
+    for (auto bodyStmt : stmt->body) {
+        if (auto comment = dynamic_cast<Comment*>(bodyStmt)) {
+            code += generateComment(comment);
+        } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(bodyStmt)) {
+            code += generateExpressionStatement(exprStmt);
+        } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(bodyStmt)) {
+            code += generateVariableDeclaration(varDecl);
+        }
+    }
+    
+    code += "    }\n";
+    return code;
+}
+
+// Generate do-while loop statement
+std::string CodeGenerator::generateDoWhileLoopStatement(DoWhileLoopStatement* stmt) {
+    std::string code = "    do {\n";
+    
+    // Generate loop body
+    for (auto bodyStmt : stmt->body) {
+        if (auto comment = dynamic_cast<Comment*>(bodyStmt)) {
+            code += generateComment(comment);
+        } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(bodyStmt)) {
+            code += generateExpressionStatement(exprStmt);
+        } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(bodyStmt)) {
+            code += generateVariableDeclaration(varDecl);
+        }
+    }
+    
+    code += "    } while (" + generateExpression(stmt->condition) + ");\n";
+    return code;
+}
+
+// Generate case statement
+std::string CodeGenerator::generateCaseStatement(CaseStatement* stmt) {
+    std::string code = "    case " + generateExpression(stmt->value) + ": {\n";
+    
+    // Generate case body
+    for (auto bodyStmt : stmt->body) {
+        if (auto comment = dynamic_cast<Comment*>(bodyStmt)) {
+            code += generateComment(comment);
+        } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(bodyStmt)) {
+            code += generateExpressionStatement(exprStmt);
+        } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(bodyStmt)) {
+            code += generateVariableDeclaration(varDecl);
+        }
+    }
+    
+    code += "        break;\n    }\n";
+    return code;
+}
+
+// Generate switch statement
+std::string CodeGenerator::generateSwitchStatement(SwitchStatement* stmt) {
+    std::string code = "    switch (" + generateExpression(stmt->expression) + ") {\n";
+    
+    // Generate case statements
+    for (auto caseStmt : stmt->cases) {
+        code += generateCaseStatement(caseStmt);
+    }
+    
+    code += "    }\n";
+    return code;
 }
 
 // Generate assignment expression
@@ -236,13 +435,13 @@ std::string CodeGenerator::generateFunctionCall(FunctionCall* call) {
         std::string arg = generateExpression(call->arguments[0]);
         
         if (call->methodName == "int") {
-            return "static_cast<int>(" + arg + ")";
+            return "std::stoi(" + arg + ")";
         } else if (call->methodName == "float") {
-            return "static_cast<float>(" + arg + ")";
+            return "std::stof(" + arg + ")";
         } else if (call->methodName == "double") {
-            return "static_cast<double>(" + arg + ")";
+            return "std::stod(" + arg + ")";
         } else if (call->methodName == "char") {
-            return "static_cast<char>(" + arg + ")";
+            return "static_cast<char>(std::stoi(" + arg + "))";
         } else if (call->methodName == "string") {
             return "std::to_string(" + arg + ")";
         }

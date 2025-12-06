@@ -132,14 +132,25 @@ f = 6.28;
 | * | Multiplication | `a * b` |
 | / | Division | `a / b` |
 
-#### 4.4.2 Bitwise Operators
+#### 4.4.2 Comparison Operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| == | Equal to | `a == b` |
+| != | Not equal to | `a != b` |
+| < | Less than | `a < b` |
+| <= | Less than or equal to | `a <= b` |
+| > | Greater than | `a > b` |
+| >= | Greater than or equal to | `a >= b` |
+
+#### 4.4.3 Bitwise Operators
 
 | Operator | Description | Example |
 |----------|-------------|---------|
 | << | Left shift | `a << 1` |
 | >> | Right shift | `a >> 1` |
 
-#### 4.4.3 Logical Operators
+#### 4.4.4 Logical Operators
 
 | Operator | Description | Example |
 |----------|-------------|---------|
@@ -147,7 +158,125 @@ f = 6.28;
 | OR | Logical OR | `a OR b` |
 | XOR | Logical XOR | `a XOR b` |
 
-### 4.5 Type Conversion
+### 4.5 Control Flow Statements
+
+#### 4.5.1 if-else-if-else Statement
+
+```vanction
+| Simple if statement
+if (condition) {
+    | Code block
+}
+
+| if-else statement
+if (condition) {
+    | Code block
+} else {
+    | Code block
+}
+
+| if-else-if-else statement
+if (condition1) {
+    | Code block 1
+} else-if (condition2) {
+    | Code block 2
+} else {
+    | Code block 3
+}
+```
+
+#### 4.5.2 for Loop
+
+```vanction
+| Traditional for loop
+for (initialization; condition; increment) {
+    | Code block
+}
+
+| Example
+for (i = 1; i <= 3; i = i + 1) {
+    System.print(i);
+}
+```
+
+#### 4.5.3 for-in Loop
+
+```vanction
+| for-in loop for string iteration
+for (char c in string) {
+    | Code block
+}
+
+| Example
+string s = "abc";
+for (char c in s) {
+    System.print(c);
+}
+```
+
+#### 4.5.4 while Loop
+
+```vanction
+| while loop
+while (condition) {
+    | Code block
+}
+
+| Example
+auto i = 1;
+while (i <= 3) {
+    System.print(i);
+    i = i + 1;
+}
+```
+
+#### 4.5.5 do-while Loop
+
+```vanction
+| do-while loop
+| Guaranteed to execute at least once
+do {
+    | Code block
+} while(condition)
+
+| Example
+auto i = 1;
+do {
+    System.print(i);
+    i = i + 1;
+} while(i <= 3)
+```
+
+#### 4.5.6 switch Statement
+
+```vanction
+| switch statement
+switch(expression) {
+    case value1 {
+        | Code block 1
+    }
+    case value2 {
+        | Code block 2
+    }
+    // More cases...
+}
+
+| Example
+auto num = 2;
+switch(num) {
+    case 1 {
+        System.print("One");
+    }
+    case 2 {
+        System.print("Two");
+    }
+    case 3 {
+        System.print("Three");
+    }
+}
+```
+
+### 4.6 Type Conversion
 
 Vanction provides type conversion functions for converting between different data types:
 
@@ -165,9 +294,9 @@ double d = type.double(b);
 string s = type.string(b);
 ```
 
-### 4.6 Input/Output
+### 4.7 Input/Output
 
-#### 4.6.1 Output
+#### 4.7.1 Output
 
 ```vanction
 | Output string
@@ -182,7 +311,7 @@ string name = "Vanction";
 System.print("Hello, " + name + "!");
 ```
 
-#### 4.6.2 Input
+#### 4.7.2 Input
 
 ```vanction
 | Get user input with prompt
@@ -334,5 +463,5 @@ Issues and Pull Requests are welcome!
 
 For questions or suggestions, please contact:
 
-- Project Address: [VanctionProgramLanguage](https://github.com/bilibili-dideng/VanctionProgramLanguage)
+- Project Address: [VanctionProgramLanguage](https://github.com/bilibili-dideng/VanctionProgrammingLanguage)
 - Email: 3483434955@qq.com

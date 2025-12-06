@@ -95,11 +95,17 @@ Token Lexer::getNextToken() {
             token.line = line;
             token.column = column - 2;
             return token;
+        } else if (pos < source.length() && source[pos] == '=') {
+            advance();
+            Token token;
+            token.type = LESS_EQUAL;
+            token.value = "<=";
+            token.line = line;
+            token.column = column - 2;
+            return token;
         }
-        // If it's just a single '<', we should return it as an identifier for now
-        // We'll handle it properly in the parser if needed
         Token token;
-        token.type = IDENTIFIER;
+        token.type = LESS_THAN;
         token.value = "<";
         token.line = line;
         token.column = column - 1;
@@ -115,11 +121,17 @@ Token Lexer::getNextToken() {
             token.line = line;
             token.column = column - 2;
             return token;
+        } else if (pos < source.length() && source[pos] == '=') {
+            advance();
+            Token token;
+            token.type = GREATER_EQUAL;
+            token.value = ">=";
+            token.line = line;
+            token.column = column - 2;
+            return token;
         }
-        // If it's just a single '>', we should return it as an identifier for now
-        // We'll handle it properly in the parser if needed
         Token token;
-        token.type = IDENTIFIER;
+        token.type = GREATER_THAN;
         token.value = ">";
         token.line = line;
         token.column = column - 1;
@@ -172,12 +184,33 @@ Token Lexer::getNextToken() {
     }
     if (current == '=') {
         advance();
+        if (pos < source.length() && source[pos] == '=') {
+            advance();
+            Token token;
+            token.type = EQUAL;
+            token.value = "==";
+            token.line = line;
+            token.column = column - 2;
+            return token;
+        }
         Token token;
         token.type = ASSIGN;
         token.value = "=";
         token.line = line;
         token.column = column - 1;
         return token;
+    }
+    if (current == '!') {
+        advance();
+        if (pos < source.length() && source[pos] == '=') {
+            advance();
+            Token token;
+            token.type = NOT_EQUAL;
+            token.value = "!=";
+            token.line = line;
+            token.column = column - 2;
+            return token;
+        }
     }
     if (current == '+') {
         advance();
@@ -236,7 +269,7 @@ Token Lexer::parseIdentifierOrKeyword() {
     int start_line = line;
     int start_column = column;
     
-    while (pos < source.length() && isalnum(source[pos])) {
+    while (pos < source.length() && (isalnum(source[pos]) || source[pos] == '-')) {
         advance();
     }
     
@@ -249,7 +282,10 @@ Token Lexer::parseIdentifierOrKeyword() {
     // Check if it's a keyword
     if (value == "func" || value == "int" || value == "char" || value == "string" || 
         value == "bool" || value == "auto" || value == "define" || value == "true" || value == "false" ||
-        value == "float" || value == "double" || value == "AND" || value == "OR" || value == "XOR") {
+        value == "float" || value == "double" || value == "AND" || value == "OR" || value == "XOR" ||
+        // Control flow keywords
+        value == "if" || value == "else" || value == "else-if" || value == "for" || value == "while" || value == "do" ||
+        value == "switch" || value == "case" || value == "in") {
         token.type = KEYWORD;
         token.value = value;
     } else {

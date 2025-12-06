@@ -55,6 +55,27 @@ private:
     
     // Generate comment
     std::string generateComment(Comment* comment);
+    
+    // Generate if statement
+    std::string generateIfStatement(IfStatement* stmt);
+    
+    // Generate for loop statement
+    std::string generateForLoopStatement(ForLoopStatement* stmt);
+    
+    // Generate for-in loop statement
+    std::string generateForInLoopStatement(ForInLoopStatement* stmt);
+    
+    // Generate while loop statement
+    std::string generateWhileLoopStatement(WhileLoopStatement* stmt);
+    
+    // Generate do-while loop statement
+    std::string generateDoWhileLoopStatement(DoWhileLoopStatement* stmt);
+    
+    // Generate case statement
+    std::string generateCaseStatement(CaseStatement* stmt);
+    
+    // Generate switch statement
+    std::string generateSwitchStatement(SwitchStatement* stmt);
 };
 
 #endif // VANCTION_CODE_GENERATOR_H

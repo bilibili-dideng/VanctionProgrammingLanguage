@@ -152,6 +152,245 @@ std::vector<ASTNode*> Parser::parseFunctionBodyAST() {
     return body;
 }
 
+// Parse block of code
+std::vector<ASTNode*> Parser::parseBlock() {
+    consume(LBRACE);
+    auto block = parseFunctionBodyAST();
+    consume(RBRACE);
+    return block;
+}
+
+// Parse if statement
+Statement* Parser::parseIfStatement() {
+    // Consume 'if' keyword
+    consume(KEYWORD);
+    
+    // Consume '('
+    consume(LPAREN);
+    
+    // Parse condition
+    auto condition = parseExpression();
+    
+    // Consume ')'
+    consume(RPAREN);
+    
+    // Parse if body
+    auto ifBody = parseBlock();
+    
+    // Create if statement node
+    auto ifStmt = new IfStatement(condition, ifBody);
+    
+    // Parse else-if clauses and else clause
+    while (true) {
+        // Check if it's 'else' or 'else-if'
+        if (currentToken.type == KEYWORD && (currentToken.value == "else" || currentToken.value == "else-if")) {
+            bool isElseIf = (currentToken.value == "else-if");
+            
+            // Consume 'else' or 'else-if' keyword
+            consume(KEYWORD);
+            
+            if (isElseIf) {
+                // It's an else-if clause
+                // Consume '('
+                consume(LPAREN);
+                
+                // Parse else-if condition
+                auto elseIfCondition = parseExpression();
+                
+                // Consume ')'
+                consume(RPAREN);
+                
+                // Parse else-if body
+                auto elseIfBody = parseBlock();
+                
+                // Create else-if statement
+                auto elseIfStmt = new IfStatement(elseIfCondition, elseIfBody);
+                ifStmt->elseIfs.push_back(elseIfStmt);
+            } else {
+                // It's a simple else clause
+                // Parse else body
+                auto elseBody = parseBlock();
+                ifStmt->elseBody = elseBody;
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    
+    return ifStmt;
+}
+
+// Parse for loop statement
+Statement* Parser::parseForLoopStatement() {
+    // Consume '('
+    consume(LPAREN);
+    
+    // Parse initialization (allow variable declaration or assignment)
+    Statement* initialization = nullptr;
+    
+    // Check if it's an assignment expression
+    if (currentToken.type == IDENTIFIER) {
+        // Look ahead to see if it's an assignment
+        Token nextToken = lexer->getNextToken();
+        if (nextToken.type == ASSIGN) {
+            // It's an assignment expression, parse it as expression statement
+            currentToken = nextToken;
+            auto expr = parseExpression();
+            initialization = new ExpressionStatement(expr);
+        } else {
+            // It's a variable declaration, parse it as statement
+            // This approach doesn't require private member access
+            currentToken = nextToken;
+            // Reconstruct the token stream by parsing the statement
+            initialization = parseStatement();
+        }
+    } else {
+        // It's a variable declaration, parse it as statement
+        initialization = parseStatement();
+    }
+    
+    // Expect semicolon after initialization
+    consume(SEMICOLON);
+    
+    // Parse condition
+    auto condition = parseExpression();
+    
+    // Expect semicolon after condition
+    consume(SEMICOLON);
+    
+    // Parse increment
+    auto increment = parseExpression();
+    
+    // Consume ')'
+    consume(RPAREN);
+    
+    // Parse loop body
+    auto body = parseBlock();
+    
+    // Create for loop statement node
+    return new ForLoopStatement(initialization, condition, increment, body);
+}
+
+// Parse for-in loop statement
+Statement* Parser::parseForInLoopStatement() {
+    // Consume 'for' keyword
+    consume(KEYWORD);
+    
+    // Consume '('
+    consume(LPAREN);
+    
+    // Parse variable name
+    std::string varName = currentToken.value;
+    consume(IDENTIFIER);
+    
+    // Consume 'in' keyword
+    consume(KEYWORD);
+    
+    // Parse collection expression
+    auto collection = parseExpression();
+    
+    // Consume ')'
+    consume(RPAREN);
+    
+    // Parse loop body
+    auto body = parseBlock();
+    
+    // Create for-in loop statement node
+    return new ForInLoopStatement(varName, collection, body);
+}
+
+// Parse while loop statement
+Statement* Parser::parseWhileLoopStatement() {
+    // Consume 'while' keyword
+    consume(KEYWORD);
+    
+    // Consume '('
+    consume(LPAREN);
+    
+    // Parse condition
+    auto condition = parseExpression();
+    
+    // Consume ')'
+    consume(RPAREN);
+    
+    // Parse loop body
+    auto body = parseBlock();
+    
+    // Create while loop statement node
+    return new WhileLoopStatement(condition, body);
+}
+
+// Parse do-while loop statement
+Statement* Parser::parseDoWhileLoopStatement() {
+    // Consume 'do' keyword
+    consume(KEYWORD);
+    
+    // Parse loop body
+    auto body = parseBlock();
+    
+    // Consume 'while' keyword
+    consume(KEYWORD);
+    
+    // Consume '('
+    consume(LPAREN);
+    
+    // Parse condition
+    auto condition = parseExpression();
+    
+    // Consume ')'
+    consume(RPAREN);
+    
+    // Create do-while loop statement node
+    return new DoWhileLoopStatement(body, condition);
+}
+
+// Parse case statement for switch
+CaseStatement* Parser::parseCaseStatement() {
+    // Consume 'case' keyword
+    consume(KEYWORD);
+    
+    // Parse case value
+    auto value = parseExpression();
+    
+    // Parse case body
+    auto body = parseBlock();
+    
+    // Create case statement node
+    return new CaseStatement(value, body);
+}
+
+// Parse switch statement
+Statement* Parser::parseSwitchStatement() {
+    // Consume 'switch' keyword
+    consume(KEYWORD);
+    
+    // Consume '('
+    consume(LPAREN);
+    
+    // Parse expression
+    auto expression = parseExpression();
+    
+    // Consume ')'
+    consume(RPAREN);
+    
+    // Consume '{'
+    consume(LBRACE);
+    
+    // Parse case statements
+    std::vector<CaseStatement*> cases;
+    while (currentToken.type == KEYWORD && currentToken.value == "case") {
+        auto caseStmt = parseCaseStatement();
+        cases.push_back(caseStmt);
+    }
+    
+    // Consume '}'
+    consume(RBRACE);
+    
+    // Create switch statement node
+    return new SwitchStatement(expression, cases);
+}
+
 // Parse statement
 Statement* Parser::parseStatement() {
     // Check for variable declaration
@@ -160,6 +399,167 @@ Statement* Parser::parseStatement() {
          currentToken.value == "bool" || currentToken.value == "float" || currentToken.value == "double" ||
          currentToken.value == "auto" || currentToken.value == "define")) {
         return parseVariableDeclaration();
+    }
+    
+    // Check for if statement
+    if (currentToken.type == KEYWORD && currentToken.value == "if") {
+        return parseIfStatement();
+    }
+    
+    // Check for for loop statement
+    if (currentToken.type == KEYWORD && currentToken.value == "for") {
+        // Parse the 'for' keyword
+        consume(KEYWORD);
+        
+        // Consume '('
+        consume(LPAREN);
+        
+        // We'll use a simpler approach to distinguish between for-in and traditional for loops
+        // Check if the next token after identifier is 'in'
+        // This approach doesn't require private member access
+        
+        // Parse the first token inside for loop
+        Token loopToken = currentToken;
+        std::string varName;
+        
+        // Check if it's a type specifier followed by identifier (for-in loop with type annotation)
+        if (loopToken.type == KEYWORD && 
+            (loopToken.value == "int" || loopToken.value == "char" || loopToken.value == "string" || 
+             loopToken.value == "bool" || loopToken.value == "float" || loopToken.value == "double")) {
+            // It's a type specifier, consume it and parse the identifier
+            consume(KEYWORD);
+            
+            if (currentToken.type == IDENTIFIER) {
+                varName = currentToken.value;
+                consume(IDENTIFIER);
+                
+                // Check if next token is 'in'
+                if (currentToken.type == KEYWORD && currentToken.value == "in") {
+                    // It's a for-in loop
+                    // Consume 'in' keyword
+                    consume(KEYWORD);
+                    
+                    // Parse collection expression
+                    auto collection = parseExpression();
+                    
+                    // Consume ')'
+                    consume(RPAREN);
+                    
+                    // Parse loop body
+                    auto body = parseBlock();
+                    
+                    // Create for-in loop statement node
+                    return new ForInLoopStatement(varName, collection, body);
+                }
+            }
+        } 
+        // If it's an identifier, check if next token is 'in' keyword
+        else if (loopToken.type == IDENTIFIER) {
+            // Consume the identifier (we'll use it later if it's for-in)
+            varName = loopToken.value;
+            consume(IDENTIFIER);
+            
+            // Check if next token is 'in'
+            if (currentToken.type == KEYWORD && currentToken.value == "in") {
+                // It's a for-in loop
+                // Consume 'in' keyword
+                consume(KEYWORD);
+                
+                // Parse collection expression
+                auto collection = parseExpression();
+                
+                // Consume ')'
+                consume(RPAREN);
+                
+                // Parse loop body
+                auto body = parseBlock();
+                
+                // Create for-in loop statement node
+                return new ForInLoopStatement(varName, collection, body);
+            } else {
+                // It's a traditional for loop with variable assignment
+                // We need to parse i = 1 as initialization
+                // Reconstruct the identifier by adding it back to the source
+                // This is a safer approach that allows us to handle assignment expressions
+                
+                // Create an assignment expression manually
+                auto ident = new Identifier(varName);
+                
+                // Check if next token is assignment operator
+                if (currentToken.type == ASSIGN) {
+                    consume(ASSIGN);
+                    auto right = parseExpression();
+                    auto assignment = new AssignmentExpression(ident, right);
+                    Statement* initialization = new ExpressionStatement(assignment);
+                    
+                    // Expect semicolon after initialization
+                    consume(SEMICOLON);
+                    
+                    // Parse condition
+                    auto condition = parseExpression();
+                    
+                    // Expect semicolon after condition
+                    consume(SEMICOLON);
+                    
+                    // Parse increment
+                    auto increment = parseExpression();
+                    
+                    // Consume ')'
+                    consume(RPAREN);
+                    
+                    // Parse loop body
+                    auto body = parseBlock();
+                    
+                    // Create for loop statement node
+                    return new ForLoopStatement(initialization, condition, increment, body);
+                } else {
+                    // It's a variable declaration with type
+                    // This is not supported yet, but we'll handle it gracefully
+                    std::cerr << "Syntax error: Expected assignment operator after identifier in for loop initialization" << std::endl;
+                    exit(1);
+                }
+            }
+        } else {
+            // It's a traditional for loop with variable declaration
+            // Parse initialization as variable declaration
+            Statement* initialization = parseStatement();
+            
+            // Expect semicolon after initialization
+            consume(SEMICOLON);
+            
+            // Parse condition
+            auto condition = parseExpression();
+            
+            // Expect semicolon after condition
+            consume(SEMICOLON);
+            
+            // Parse increment
+            auto increment = parseExpression();
+            
+            // Consume ')'
+            consume(RPAREN);
+            
+            // Parse loop body
+            auto body = parseBlock();
+            
+            // Create for loop statement node
+            return new ForLoopStatement(initialization, condition, increment, body);
+        }
+    }
+    
+    // Check for while loop statement
+    if (currentToken.type == KEYWORD && currentToken.value == "while") {
+        return parseWhileLoopStatement();
+    }
+    
+    // Check for do-while loop statement
+    if (currentToken.type == KEYWORD && currentToken.value == "do") {
+        return parseDoWhileLoopStatement();
+    }
+    
+    // Check for switch statement
+    if (currentToken.type == KEYWORD && currentToken.value == "switch") {
+        return parseSwitchStatement();
     }
     
     // Parse expression
@@ -330,9 +730,46 @@ Expression* Parser::parseLogicalExpression() {
     return left;
 }
 
-// Parse binary expression (now delegates to logical expression)
+// Parse comparison expressions
+Expression* Parser::parseComparisonExpression() {
+    auto left = parseLogicalExpression();
+    
+    while (true) {
+        if (currentToken.type == EQUAL) {
+            consume(EQUAL);
+            auto right = parseLogicalExpression();
+            left = new BinaryExpression(left, "==", right);
+        } else if (currentToken.type == NOT_EQUAL) {
+            consume(NOT_EQUAL);
+            auto right = parseLogicalExpression();
+            left = new BinaryExpression(left, "!=", right);
+        } else if (currentToken.type == LESS_THAN) {
+            consume(LESS_THAN);
+            auto right = parseLogicalExpression();
+            left = new BinaryExpression(left, "<", right);
+        } else if (currentToken.type == LESS_EQUAL) {
+            consume(LESS_EQUAL);
+            auto right = parseLogicalExpression();
+            left = new BinaryExpression(left, "<=", right);
+        } else if (currentToken.type == GREATER_THAN) {
+            consume(GREATER_THAN);
+            auto right = parseLogicalExpression();
+            left = new BinaryExpression(left, ">", right);
+        } else if (currentToken.type == GREATER_EQUAL) {
+            consume(GREATER_EQUAL);
+            auto right = parseLogicalExpression();
+            left = new BinaryExpression(left, ">=", right);
+        } else {
+            break;
+        }
+    }
+    
+    return left;
+}
+
+// Parse binary expression (now delegates to comparison expression)
 Expression* Parser::parseBinaryExpression() {
-    return parseLogicalExpression();
+    return parseComparisonExpression();
 }
 
 // Parse primary expression
@@ -529,6 +966,12 @@ std::string Parser::tokenTypeToString(TokenType type) {
         case XOR: return "xor operator";
         case COMMENT: return "comment";
         case EOF_TOKEN: return "end of file";
+        case EQUAL: return "equal operator";
+        case NOT_EQUAL: return "not equal operator";
+        case LESS_THAN: return "less than operator";
+        case LESS_EQUAL: return "less equal operator";
+        case GREATER_THAN: return "greater than operator";
+        case GREATER_EQUAL: return "greater equal operator";
         default: return "unknown type";
     }
 }

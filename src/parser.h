@@ -76,6 +76,9 @@ private:
     // Parse binary expression
     Expression* parseBinaryExpression();
     
+    // Parse comparison expression
+    Expression* parseComparisonExpression();
+    
     // Parse multiplicative expression
     Expression* parseMultiplicativeExpression();
     
@@ -90,6 +93,30 @@ private:
     
     // Parse function call
     Expression* parseFunctionCall();
+    
+    // Parse block of code
+    std::vector<ASTNode*> parseBlock();
+    
+    // Parse if statement
+    Statement* parseIfStatement();
+    
+    // Parse for loop statement
+    Statement* parseForLoopStatement();
+    
+    // Parse for-in loop statement
+    Statement* parseForInLoopStatement();
+    
+    // Parse while loop statement
+    Statement* parseWhileLoopStatement();
+    
+    // Parse do-while loop statement
+    Statement* parseDoWhileLoopStatement();
+    
+    // Parse case statement for switch
+    CaseStatement* parseCaseStatement();
+    
+    // Parse switch statement
+    Statement* parseSwitchStatement();
 };
 
 #endif // VANCTION_PARSER_H

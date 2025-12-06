@@ -186,7 +186,141 @@ public:
         : expression(expression) {}
     
     ~ExpressionStatement() {
+        if (expression) {
+            delete expression;
+        }
+    }
+};
+
+// If-else statement
+class IfStatement : public Statement {
+public:
+    Expression* condition;
+    std::vector<ASTNode*> ifBody;
+    std::vector<IfStatement*> elseIfs;
+    std::vector<ASTNode*> elseBody;
+    
+    IfStatement(Expression* condition, const std::vector<ASTNode*>& ifBody)
+        : condition(condition), ifBody(ifBody) {}
+    
+    ~IfStatement() {
+        delete condition;
+        for (auto node : ifBody) {
+            delete node;
+        }
+        for (auto elseIf : elseIfs) {
+            delete elseIf;
+        }
+        for (auto node : elseBody) {
+            delete node;
+        }
+    }
+};
+
+// For loop statement (traditional)
+class ForLoopStatement : public Statement {
+public:
+    Statement* initialization;
+    Expression* condition;
+    Expression* increment;
+    std::vector<ASTNode*> body;
+    
+    ForLoopStatement(Statement* initialization, Expression* condition, Expression* increment, const std::vector<ASTNode*>& body)
+        : initialization(initialization), condition(condition), increment(increment), body(body) {}
+    
+    ~ForLoopStatement() {
+        delete initialization;
+        delete condition;
+        delete increment;
+        for (auto node : body) {
+            delete node;
+        }
+    }
+};
+
+// For in loop statement (enhanced)
+class ForInLoopStatement : public Statement {
+public:
+    std::string variableName;
+    Expression* collection;
+    std::vector<ASTNode*> body;
+    
+    ForInLoopStatement(const std::string& variableName, Expression* collection, const std::vector<ASTNode*>& body)
+        : variableName(variableName), collection(collection), body(body) {}
+    
+    ~ForInLoopStatement() {
+        delete collection;
+        for (auto node : body) {
+            delete node;
+        }
+    }
+};
+
+// While loop statement
+class WhileLoopStatement : public Statement {
+public:
+    Expression* condition;
+    std::vector<ASTNode*> body;
+    
+    WhileLoopStatement(Expression* condition, const std::vector<ASTNode*>& body)
+        : condition(condition), body(body) {}
+    
+    ~WhileLoopStatement() {
+        delete condition;
+        for (auto node : body) {
+            delete node;
+        }
+    }
+};
+
+// Do-while loop statement
+class DoWhileLoopStatement : public Statement {
+public:
+    std::vector<ASTNode*> body;
+    Expression* condition;
+    
+    DoWhileLoopStatement(const std::vector<ASTNode*>& body, Expression* condition)
+        : body(body), condition(condition) {}
+    
+    ~DoWhileLoopStatement() {
+        for (auto node : body) {
+            delete node;
+        }
+        delete condition;
+    }
+};
+
+// Case statement for switch
+class CaseStatement : public Statement {
+public:
+    Expression* value;
+    std::vector<ASTNode*> body;
+    
+    CaseStatement(Expression* value, const std::vector<ASTNode*>& body)
+        : value(value), body(body) {}
+    
+    ~CaseStatement() {
+        delete value;
+        for (auto node : body) {
+            delete node;
+        }
+    }
+};
+
+// Switch statement
+class SwitchStatement : public Statement {
+public:
+    Expression* expression;
+    std::vector<CaseStatement*> cases;
+    
+    SwitchStatement(Expression* expression, const std::vector<CaseStatement*>& cases)
+        : expression(expression), cases(cases) {}
+    
+    ~SwitchStatement() {
         delete expression;
+        for (auto caseStmt : cases) {
+            delete caseStmt;
+        }
     }
 };
 

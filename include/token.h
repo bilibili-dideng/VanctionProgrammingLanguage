@@ -29,8 +29,16 @@ enum TokenType {
     OR,
     XOR,
     COMMENT,
-    EOF_TOKEN
-};
+    EOF_TOKEN,
+    // Comparison operators
+    EQUAL,
+    NOT_EQUAL,
+    LESS_THAN,
+    LESS_EQUAL,
+    GREATER_THAN,
+    GREATER_EQUAL,
+    // Control flow keywords (will be handled as KEYWORD type with specific values)
+}; 
 
 // Token structure
 struct Token {
