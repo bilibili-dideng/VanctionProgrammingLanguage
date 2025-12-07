@@ -15,6 +15,10 @@ enum class ErrorType {
     TokenError,
     SyntaxError,
     MainFunctionError,
+    ListIndexError,
+    HashMapKeyError,
+    TypeError,
+    RangeError,
     UnknownError
 };
 
@@ -93,6 +97,31 @@ namespace vanction_error {
     public:
         explicit UnknownError(const std::string& message, int line = 1, int column = 1)
             : VanctionError("UnknownError", message, line, column) {}
+    };
+    
+    // New error classes for advanced structures
+    class ListIndexError : public VanctionError {
+    public:
+        explicit ListIndexError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("ListIndexError", message, line, column) {}
+    };
+    
+    class HashMapKeyError : public VanctionError {
+    public:
+        explicit HashMapKeyError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("HashMapKeyError", message, line, column) {}
+    };
+    
+    class TypeError : public VanctionError {
+    public:
+        explicit TypeError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("TypeError", message, line, column) {}
+    };
+    
+    class RangeError : public VanctionError {
+    public:
+        explicit RangeError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("RangeError", message, line, column) {}
     };
 }
 

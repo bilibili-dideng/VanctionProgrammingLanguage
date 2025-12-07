@@ -97,6 +97,15 @@ private:
     
     // Generate instance access expression
     std::string generateInstanceAccessExpression(InstanceAccessExpression* expr);
+    
+    // Generate list literal expression
+    std::string generateListLiteral(ListLiteral* list);
+    
+    // Generate hash map literal expression
+    std::string generateHashMapLiteral(HashMapLiteral* hashMap);
+    
+    // Generate range expression
+    std::string generateRangeExpression(RangeExpression* range);
 };
 
 #endif // VANCTION_CODE_GENERATOR_H

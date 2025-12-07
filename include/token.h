@@ -20,6 +20,8 @@ enum TokenType {
     RPAREN,
     LBRACE,
     RBRACE,
+    LBRACKET,
+    RBRACKET,
     ASSIGN,
     PLUS,
     MINUS,

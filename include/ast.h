@@ -275,15 +275,83 @@ public:
     }
 };
 
+// List literal expression
+class ListLiteral : public Expression {
+public:
+    std::vector<Expression*> elements;
+    
+    ListLiteral(int line = 1, int column = 1)
+        : Expression(line, column) {}
+    
+    ~ListLiteral() {
+        for (auto elem : elements) {
+            delete elem;
+        }
+    }
+};
+
+// Hash map literal entry
+struct HashMapEntry {
+    Expression* key;
+    Expression* value;
+    
+    HashMapEntry(Expression* key, Expression* value)
+        : key(key), value(value) {}
+    
+    ~HashMapEntry() {
+        delete key;
+        delete value;
+    }
+};
+
+// Hash map literal expression
+class HashMapLiteral : public Expression {
+public:
+    std::vector<HashMapEntry*> entries;
+    
+    HashMapLiteral(int line = 1, int column = 1)
+        : Expression(line, column) {}
+    
+    ~HashMapLiteral() {
+        for (auto entry : entries) {
+            delete entry;
+        }
+    }
+};
+
+// Range expression
+class RangeExpression : public Expression {
+public:
+    Expression* start;
+    Expression* end;
+    Expression* step;
+    
+    RangeExpression(Expression* start, Expression* end, Expression* step = nullptr, int line = 1, int column = 1)
+        : Expression(line, column), start(start), end(end), step(step) {}
+    
+    ~RangeExpression() {
+        delete start;
+        delete end;
+        if (step) {
+            delete step;
+        }
+    }
+};
+
 // For in loop statement (enhanced)
 class ForInLoopStatement : public Statement {
 public:
-    std::string variableName;
+    std::string keyVariableName;
+    std::string valueVariableName;
     Expression* collection;
     std::vector<ASTNode*> body;
+    bool isKeyValuePair;
     
     ForInLoopStatement(const std::string& variableName, Expression* collection, const std::vector<ASTNode*>& body)
-        : variableName(variableName), collection(collection), body(body) {}
+        : keyVariableName(variableName), collection(collection), body(body), isKeyValuePair(false) {}
+    
+    ForInLoopStatement(const std::string& keyVariableName, const std::string& valueVariableName, Expression* collection, const std::vector<ASTNode*>& body)
+        : keyVariableName(keyVariableName), valueVariableName(valueVariableName), collection(collection), body(body), isKeyValuePair(true) {}
     
     ~ForInLoopStatement() {
         delete collection;

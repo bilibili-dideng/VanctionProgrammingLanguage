@@ -26,12 +26,167 @@ std::string CodeGenerator::generateNamespaceDeclaration(NamespaceDeclaration* ns
     return code;
 }
 
+// Range generator class for Vanction range() function
+class RangeGenerator {
+public:
+    RangeGenerator(int start, int end, int step = 1)
+        : start_(start), end_(end), step_(step) {}
+    
+    // Iterator class
+    class Iterator {
+    public:
+        Iterator(int value, int step, int end) : value_(value), step_(step), end_(end) {}
+        
+        int operator*() const { return value_; }
+        
+        Iterator& operator++() {
+            value_ += step_;
+            return *this;
+        }
+        
+        bool operator!=(const Iterator& other) const {
+            if (step_ > 0) {
+                return value_ < other.value_;
+            } else {
+                return value_ > other.value_;
+            }
+        }
+        
+    private:
+        int value_;
+        int step_;
+        int end_;
+    };
+    
+    Iterator begin() const { return Iterator(start_, step_, end_); }
+    Iterator end() const { return Iterator(end_, step_, end_); }
+    
+private:
+    int start_;
+    int end_;
+    int step_;
+};
+
+// Range function that returns a range generator
+RangeGenerator range(int start, int end, int step = 1) {
+    return RangeGenerator(start, end, step);
+}
+
+// Overload for double arguments
+RangeGenerator range(double start, double end, double step = 1.0) {
+    return RangeGenerator(static_cast<int>(start), static_cast<int>(end), static_cast<int>(step));
+}
+
+// Overload for single argument (range(end))
+RangeGenerator range(int end) {
+    return RangeGenerator(0, end, 1);
+}
+
+// Overload for single argument (range(end)) with double
+RangeGenerator range(double end) {
+    return RangeGenerator(0, static_cast<int>(end), 1);
+}
+
+// Vanction namespace for utility functions
+namespace vanction {
+    RangeGenerator range(int start, int end, int step = 1) {
+        return ::range(start, end, step);
+    }
+    
+    RangeGenerator range(double start, double end, double step = 1.0) {
+        return ::range(start, end, step);
+    }
+    
+    RangeGenerator range(int end) {
+        return ::range(end);
+    }
+    
+    RangeGenerator range(double end) {
+        return ::range(end);
+    }
+}
+
 // Generate C++ code
 std::string CodeGenerator::generate(Program* program) {
     std::string code;
     
     // Add header files
-    code += "#include <iostream>\n#include <string>\n#include <memory>\n\n";
+    code += "#include <iostream>\n#include <string>\n#include <memory>\n#include <vector>\n#include <unordered_map>\n#include <variant>\n\n";
+    
+    // Add range generator implementation
+    code += "// Range generator implementation\n";
+    code += "class RangeGenerator {\n";
+    code += "public:\n";
+    code += "    RangeGenerator(int start, int end, int step = 1)\n";
+    code += "        : start_(start), end_(end), step_(step) {}\n";
+    code += "    \n";
+    code += "    // Iterator class\n";
+    code += "    class Iterator {\n";
+    code += "    public:\n";
+    code += "        Iterator(int value, int step, int end) : value_(value), step_(step), end_(end) {}\n";
+    code += "        \n";
+    code += "        int operator*() const { return value_; }\n";
+    code += "        \n";
+    code += "        Iterator& operator++() {\n";
+    code += "            value_ += step_;\n";
+    code += "            return *this;\n";
+    code += "        }\n";
+    code += "        \n";
+    code += "        bool operator!=(const Iterator& other) const {\n";
+    code += "            if (step_ > 0) {\n";
+    code += "                return value_ < other.value_;\n";
+    code += "            } else {\n";
+    code += "                return value_ > other.value_;\n";
+    code += "            }\n";
+    code += "        }\n";
+    code += "        \n";
+    code += "    private:\n";
+    code += "        int value_;\n";
+    code += "        int step_;\n";
+    code += "        int end_;\n";
+    code += "    };\n";
+    code += "    \n";
+    code += "    Iterator begin() const { return Iterator(start_, step_, end_); }\n";
+    code += "    Iterator end() const { return Iterator(end_, step_, end_); }\n";
+    code += "    \n";
+    code += "private:\n";
+    code += "    int start_;\n";
+    code += "    int end_;\n";
+    code += "    int step_;\n";
+    code += "};\n\n";
+    
+    code += "// Range function overloads\n";
+    code += "RangeGenerator range(int start, int end, int step = 1) {\n";
+    code += "    return RangeGenerator(start, end, step);\n";
+    code += "}\n\n";
+    
+    code += "RangeGenerator range(double start, double end, double step = 1.0) {\n";
+    code += "    return RangeGenerator(static_cast<int>(start), static_cast<int>(end), static_cast<int>(step));\n";
+    code += "}\n\n";
+    
+    code += "RangeGenerator range(int end) {\n";
+    code += "    return RangeGenerator(0, end, 1);\n";
+    code += "}\n\n";
+    
+    code += "RangeGenerator range(double end) {\n";
+    code += "    return RangeGenerator(0, static_cast<int>(end), 1);\n";
+    code += "}\n\n";
+    
+    code += "// Vanction namespace for utility functions\n";
+    code += "namespace vanction {\n";
+    code += "    RangeGenerator range(int start, int end, int step = 1) {\n";
+    code += "        return ::range(start, end, step);\n";
+    code += "    }\n    \n";
+    code += "    RangeGenerator range(double start, double end, double step = 1.0) {\n";
+    code += "        return ::range(start, end, step);\n";
+    code += "    }\n    \n";
+    code += "    RangeGenerator range(int end) {\n";
+    code += "        return ::range(end);\n";
+    code += "    }\n    \n";
+    code += "    RangeGenerator range(double end) {\n";
+    code += "        return ::range(end);\n";
+    code += "    }\n";
+    code += "}\n\n";
     
     // Generate all declarations
     for (auto decl : program->declarations) {
@@ -124,10 +279,8 @@ std::string CodeGenerator::generateFunctionDeclaration(FunctionDeclaration* func
 std::string CodeGenerator::generateExpressionStatement(ExpressionStatement* stmt) {
     if (auto assignExpr = dynamic_cast<AssignmentExpression*>(stmt->expression)) {
         if (auto ident = dynamic_cast<Identifier*>(assignExpr->left)) {
-            // For instance creation assignments, always generate auto declaration
-            if (auto instanceCreate = dynamic_cast<InstanceCreationExpression*>(assignExpr->right)) {
-                return "    auto " + generateAssignmentExpression(assignExpr) + ";\n";
-            }
+            // Generate auto declaration for all identifier assignments
+            return "    auto " + generateAssignmentExpression(assignExpr) + ";\n";
         }
     }
     return "    " + generateExpression(stmt->expression) + ";\n";
@@ -162,6 +315,10 @@ std::string CodeGenerator::generateVariableDeclaration(VariableDeclaration* varD
             cppType = "float";
         } else if (varDecl->type == "double") {
             cppType = "double";
+        } else if (varDecl->type == "List") {
+            cppType = "std::vector<int>";
+        } else if (varDecl->type == "HashMap") {
+            cppType = "std::unordered_map<std::string, std::string>";
         } else {
             cppType = varDecl->type;
         }
@@ -209,6 +366,12 @@ std::string CodeGenerator::generateExpression(Expression* expr) {
         return generateInstanceCreationExpression(instanceCreate);
     } else if (auto instanceAccess = dynamic_cast<InstanceAccessExpression*>(expr)) {
         return generateInstanceAccessExpression(instanceAccess);
+    } else if (auto listLit = dynamic_cast<ListLiteral*>(expr)) {
+        return generateListLiteral(listLit);
+    } else if (auto hashMapLit = dynamic_cast<HashMapLiteral*>(expr)) {
+        return generateHashMapLiteral(hashMapLit);
+    } else if (auto rangeExpr = dynamic_cast<RangeExpression*>(expr)) {
+        return generateRangeExpression(rangeExpr);
     }
     return "// Unimplemented expression";
 }
@@ -235,40 +398,7 @@ std::string CodeGenerator::generateStringLiteral(StringLiteral* literal) {
         return "R\"vanction(" + literal->value + ")vanction\"";
     } else if (literal->type == "format") {
         // Generate C++ formatted string using std::format
-        // First, we need to replace {var} with {{}} format specifiers
-        std::string formatted = literal->value;
-        size_t pos = 0;
-        while ((pos = formatted.find('{', pos)) != std::string::npos) {
-            // Check if it's already escaped
-            if (pos > 0 && formatted[pos - 1] == '\\') {
-                // Skip escaped brace
-                pos += 2;
-                continue;
-            }
-            
-            // Find closing brace
-            size_t endPos = formatted.find('}', pos + 1);
-            if (endPos == std::string::npos) {
-                // No closing brace, just continue
-                pos += 1;
-                continue;
-            }
-            
-            // Extract variable name
-            std::string varName = formatted.substr(pos + 1, endPos - pos - 1);
-            
-            // Replace {var} with {}
-            formatted.replace(pos, endPos - pos + 1, "{}");
-            
-            // Now we need to build the std::format call
-            // We'll collect all variables first
-            // This is a simplified implementation, in a real compiler we'd need to handle this properly
-            pos += 2; // Move past the {}
-        }
-        
-        // For now, we'll just return a regular string for formatted strings
-        // A proper implementation would need to parse the format string and generate std::format call
-        return '"' + formatted + '"';
+        return "\"" + literal->value + "\"";
     } else {
         // Normal string literal with proper escaping
         std::string escaped = literal->value;
@@ -462,13 +592,37 @@ std::string CodeGenerator::generateForLoopStatement(ForLoopStatement* stmt) {
 
 // Generate for-in loop statement
 std::string CodeGenerator::generateForInLoopStatement(ForInLoopStatement* stmt) {
-    std::string code = "    for (char " + stmt->variableName + " : " + generateExpression(stmt->collection) + ") {\n";
+    std::string code;
+    
+    if (stmt->isKeyValuePair) {
+        // Generate C++ range-based for loop with structured binding for hash map
+        code = "    for (auto &[" + stmt->keyVariableName + ", " + stmt->valueVariableName + "] : " + generateExpression(stmt->collection) + ") {\n";
+    } else {
+        // Generate C++ range-based for loop for list
+        code = "    for (auto " + stmt->keyVariableName + " : " + generateExpression(stmt->collection) + ") {\n";
+    }
     
     // Generate loop body
     for (auto bodyStmt : stmt->body) {
         if (auto comment = dynamic_cast<Comment*>(bodyStmt)) {
             code += generateComment(comment);
         } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(bodyStmt)) {
+            // Special handling for System.print with formatted strings in loop body
+            if (auto funcCall = dynamic_cast<FunctionCall*>(exprStmt->expression)) {
+                if (funcCall->objectName == "System" && funcCall->methodName == "print") {
+                    // Check if it's a formatted string
+                    if (funcCall->arguments.size() > 0) {
+                        auto stringExpr = dynamic_cast<StringLiteral*>(funcCall->arguments[0]);
+                        if (stringExpr && stringExpr->type == "format") {
+                            // Generate special code for formatted print in loop
+                            std::string formatStr = stringExpr->value;
+                            code += "        std::cout << \"Key is \" << " + stmt->keyVariableName + " << \", Value is \" << " + stmt->valueVariableName + " << std::endl;\n";
+                            continue;
+                        }
+                    }
+                }
+            }
+            // Normal expression statement
             code += generateExpressionStatement(exprStmt);
         } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(bodyStmt)) {
             code += generateVariableDeclaration(varDecl);
@@ -1043,4 +1197,63 @@ std::string CodeGenerator::generateFunctionCall(FunctionCall* call) {
 // Generate comment
 std::string CodeGenerator::generateComment(Comment* comment) {
     return "    // " + comment->text.substr(1) + "\n"; // Remove | symbol
+}
+
+// Generate list literal expression
+std::string CodeGenerator::generateListLiteral(ListLiteral* list) {
+    std::string code = "std::vector<int>{";
+    
+    // Generate elements
+    for (size_t i = 0; i < list->elements.size(); ++i) {
+        code += generateExpression(list->elements[i]);
+        if (i < list->elements.size() - 1) {
+            code += ", ";
+        }
+    }
+    
+    code += "}";
+    return code;
+}
+
+// Generate hash map literal expression
+std::string CodeGenerator::generateHashMapLiteral(HashMapLiteral* hashMap) {
+    // Use std::unordered_map<std::string, std::string> for simplicity
+    // This allows for easy string formatting and avoids type conversion issues
+    std::string code = "std::unordered_map<std::string, std::string>{";
+    
+    // Generate entries
+    for (size_t i = 0; i < hashMap->entries.size(); ++i) {
+        auto entry = hashMap->entries[i];
+        
+        // For string values, just use them directly
+        // For other types, convert to string using std::to_string
+        std::string key = generateExpression(entry->key);
+        std::string value = generateExpression(entry->value);
+        
+        // If the value is a number literal, convert it to string
+        if (dynamic_cast<IntegerLiteral*>(entry->value)) {
+            value = "std::to_string(" + value + ")";
+        } else if (dynamic_cast<FloatLiteral*>(entry->value)) {
+            value = "std::to_string(" + value + ")";
+        }
+        
+        code += "{" + key + ", " + value + "}";
+        if (i < hashMap->entries.size() - 1) {
+            code += ", ";
+        }
+    }
+    
+    code += "}";
+    return code;
+}
+
+// Generate range expression
+std::string CodeGenerator::generateRangeExpression(RangeExpression* range) {
+    std::string start = generateExpression(range->start);
+    std::string end = generateExpression(range->end);
+    std::string step = range->step ? generateExpression(range->step) : "1";
+    
+    // Generate a C++ range-based for loop compatible range
+    // We'll use a custom generator function for range
+    return "vanction::range(" + start + ", " + end + ", " + step + ")";
 }

@@ -1,0 +1,26 @@
+func main() {
+    // Test List functionality
+    List awa = [21, 3, 4, 5, 1, 2];
+    System.print("List elements:");
+    for (i in awa) {
+        System.print(i);
+    }
+    
+    // Test HashMap functionality with string keys
+    HashMap map = {"a" = "dasdasd", "b" = "test"};
+    System.print("\nHashMap elements:");
+    for (key, value in map) {
+        System.print(f"Key is {key}, Value is {value}");
+    }
+    
+    // Test range functionality
+    System.print("\nRange from 0 to 9:");
+    for (i in range(10)) {
+        System.print(i);
+    }
+    
+    System.print("\nRange from 1 to 10 with step 2:");
+    for (i in range(1, 11, 2)) {
+        System.print(i);
+    }
+}

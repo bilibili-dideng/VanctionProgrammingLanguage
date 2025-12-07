@@ -124,6 +124,8 @@ f = 6.28;
 | char | 字符 | `char ch = 'a';` |
 | string | 字符串 | `string str = "Hello";` |
 | bool | 布尔值 | `bool flag = true;` |
+| List | 列表类型，支持整数元素 | `List list = [1, 2, 3];` |
+| HashMap | 哈希表类型，支持字符串键值对 | `HashMap map = {"a"="1", "b"="2"};` |
 | auto | 自动类型推断 | `auto x = 456;` |
 | undefined | 未定义值 | `define var;` |
 
@@ -213,10 +215,32 @@ for (char c in 字符串) {
     || 代码块
 }
 
+|| 用于列表迭代的 for-in 循环
+for (int i in 列表) {
+    || 代码块
+}
+
+|| 用于哈希表迭代的 for-in 循环
+for (key, value in 哈希表) {
+    || 代码块
+}
+
 || 示例
 string s = "abc";
 for (char c in s) {
     System.print(c);
+}
+
+|| 列表迭代示例
+List list = [1, 2, 3];
+for (int i in list) {
+    System.print(i);
+}
+
+|| 哈希表迭代示例
+HashMap map = {"a"="1", "b"="2"};
+for (key, value in map) {
+    System.print("Key: " + key + ", Value: " + value);
 }
 ```
 
@@ -761,17 +785,15 @@ func main() {
 
 ## 9. 已知限制
 
-1. 不支持数组和结构体
-2. 仅支持单行注释
-3. 字符串操作仅支持 `+` 拼接运算符
-4. for-in 循环仅支持字符串迭代
+1. 仅支持单行注释
+2. 字符串操作仅支持 `+` 拼接运算符
+3. List类型仅支持整数元素
+4. HashMap类型仅支持字符串键值对
 
 ## 10. 未来计划
 
-- 支持数组和结构体
 - 支持多行注释
 - 添加更多系统函数
-- 扩展 for-in 循环支持到其他集合类型
 
 ## 11. 项目结构
 

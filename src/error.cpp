@@ -39,6 +39,10 @@ std::string Error::getTypeString() const {
         case ErrorType::TokenError: return "TokenError";
         case ErrorType::SyntaxError: return "SyntaxError";
         case ErrorType::MainFunctionError: return "MainFunctionError";
+        case ErrorType::ListIndexError: return "ListIndexError";
+        case ErrorType::HashMapKeyError: return "HashMapKeyError";
+        case ErrorType::TypeError: return "TypeError";
+        case ErrorType::RangeError: return "RangeError";
         case ErrorType::UnknownError: return "UnknownError";
         default: return "UnknownError";
     }
@@ -140,12 +144,17 @@ std::string ErrorReporter::generateErrorIndicator(int lineLength, int column) {
 std::string ErrorReporter::errorTypeToString(ErrorType type) {
     switch (type) {
         case ErrorType::CError: return "C++ Error";
+        case ErrorType::MethodError: return "Method Error";
         case ErrorType::CompilationError: return "Compilation Error";
         case ErrorType::DivideByZeroError: return "Divide by Zero Error";
         case ErrorType::ValueError: return "Value Error";
         case ErrorType::TokenError: return "Token Error";
         case ErrorType::SyntaxError: return "Syntax Error";
         case ErrorType::MainFunctionError: return "Main Function Error";
+        case ErrorType::ListIndexError: return "List Index Error";
+        case ErrorType::HashMapKeyError: return "HashMap Key Error";
+        case ErrorType::TypeError: return "Type Error";
+        case ErrorType::RangeError: return "Range Error";
         default: return "Unknown Error";
     }
 }

@@ -36,10 +36,16 @@ Token Lexer::getNextToken() {
         std::cout << "[DEBUG] Lexer: Processing character '" << current << "' at line " << line << ", column " << column << std::endl;
     }
     
-    // Check for comment (now using || instead of |)
-    if (current == '|' && pos + 1 < source.length() && source[pos + 1] == '|') {
-        advance(); // Consume first |
-        advance(); // Consume second |
+    // Check for comment (using || or //)
+    if ((current == '|' && pos + 1 < source.length() && source[pos + 1] == '|') ||
+        (current == '/' && pos + 1 < source.length() && source[pos + 1] == '/')) {
+        if (current == '|') {
+            advance(); // Consume first |
+            advance(); // Consume second |
+        } else {
+            advance(); // Consume first /
+            advance(); // Consume second /
+        }
         Token token = parseComment();
         if (debugMode) {
             std::cout << "[DEBUG] Lexer: COMMENT token: " << token.value << " at line " << token.line << ", column " << token.column << std::endl;
@@ -66,6 +72,34 @@ Token Lexer::getNextToken() {
         token.column = column - 1;
         if (debugMode) {
             std::cout << "[DEBUG] Lexer: LPAREN token at line " << token.line << ", column " << token.column << std::endl;
+        }
+        return token;
+    }
+    
+    // Check for left bracket
+    if (current == '[') {
+        advance();
+        Token token;
+        token.type = LBRACKET;
+        token.value = "[";
+        token.line = line;
+        token.column = column - 1;
+        if (debugMode) {
+            std::cout << "[DEBUG] Lexer: LBRACKET token at line " << token.line << ", column " << token.column << std::endl;
+        }
+        return token;
+    }
+    
+    // Check for right bracket
+    if (current == ']') {
+        advance();
+        Token token;
+        token.type = RBRACKET;
+        token.value = "]";
+        token.line = line;
+        token.column = column - 1;
+        if (debugMode) {
+            std::cout << "[DEBUG] Lexer: RBRACKET token at line " << token.line << ", column " << token.column << std::endl;
         }
         return token;
     }
@@ -499,7 +533,7 @@ Token Lexer::parseIdentifierOrKeyword() {
     // Check if it's a keyword
     if (value == "func" || value == "int" || value == "char" || value == "string" || 
         value == "bool" || value == "auto" || value == "define" || value == "true" || value == "false" ||
-        value == "float" || value == "double" ||
+        value == "float" || value == "double" || value == "List" || value == "HashMap" ||
         // Control flow keywords
         value == "if" || value == "else" || value == "else-if" || value == "for" || value == "while" || value == "do" ||
         value == "switch" || value == "case" || value == "in" || value == "return" || value == "namespace" ||

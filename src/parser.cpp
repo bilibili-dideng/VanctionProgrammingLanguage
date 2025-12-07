@@ -639,9 +639,22 @@ Statement* Parser::parseForInLoopStatement() {
     // Consume '('
     consume(LPAREN);
     
-    // Parse variable name
-    std::string varName = currentToken.value;
+    // Check if it's a key-value pair for-in loop
+    std::string keyVarName;
+    std::string valueVarName;
+    bool isKeyValuePair = false;
+    
+    // Parse first identifier
+    keyVarName = currentToken.value;
     consume(IDENTIFIER);
+    
+    // Check if next token is comma (key-value pair syntax)
+    if (currentToken.type == COMMA) {
+        isKeyValuePair = true;
+        consume(COMMA);
+        valueVarName = currentToken.value;
+        consume(IDENTIFIER);
+    }
     
     // Consume 'in' keyword
     consume(KEYWORD);
@@ -656,7 +669,11 @@ Statement* Parser::parseForInLoopStatement() {
     auto body = parseBlock();
     
     // Create for-in loop statement node
-    return new ForInLoopStatement(varName, collection, body);
+    if (isKeyValuePair) {
+        return new ForInLoopStatement(keyVarName, valueVarName, collection, body);
+    } else {
+        return new ForInLoopStatement(keyVarName, collection, body);
+    }
 }
 
 // Parse while loop statement
@@ -756,7 +773,8 @@ Statement* Parser::parseStatement() {
     if (currentToken.type == KEYWORD && 
         (currentToken.value == "int" || currentToken.value == "char" || currentToken.value == "string" || 
          currentToken.value == "bool" || currentToken.value == "float" || currentToken.value == "double" ||
-         currentToken.value == "auto" || currentToken.value == "define")) {
+         currentToken.value == "auto" || currentToken.value == "define" || currentToken.value == "List" || 
+         currentToken.value == "HashMap")) {
         return parseVariableDeclaration();
     }
     
@@ -784,13 +802,25 @@ Statement* Parser::parseStatement() {
         // Check if it's a type specifier followed by identifier (for-in loop with type annotation)
         if (loopToken.type == KEYWORD && 
             (loopToken.value == "int" || loopToken.value == "char" || loopToken.value == "string" || 
-             loopToken.value == "bool" || loopToken.value == "float" || loopToken.value == "double")) {
+             loopToken.value == "bool" || loopToken.value == "float" || loopToken.value == "double" ||
+             loopToken.value == "List" || loopToken.value == "HashMap")) {
             // It's a type specifier, consume it and parse the identifier
             consume(KEYWORD);
             
             if (currentToken.type == IDENTIFIER) {
-                varName = currentToken.value;
+                std::string keyVarName = currentToken.value;
+                std::string valueVarName;
+                bool isKeyValuePair = false;
+                
                 consume(IDENTIFIER);
+                
+                // Check if next token is comma (key-value pair syntax)
+                if (currentToken.type == COMMA) {
+                    isKeyValuePair = true;
+                    consume(COMMA);
+                    valueVarName = currentToken.value;
+                    consume(IDENTIFIER);
+                }
                 
                 // Check if next token is 'in'
                 if (currentToken.type == KEYWORD && currentToken.value == "in") {
@@ -808,15 +838,30 @@ Statement* Parser::parseStatement() {
                     auto body = parseBlock();
                     
                     // Create for-in loop statement node
-                    return new ForInLoopStatement(varName, collection, body);
+                    if (isKeyValuePair) {
+                        return new ForInLoopStatement(keyVarName, valueVarName, collection, body);
+                    } else {
+                        return new ForInLoopStatement(keyVarName, collection, body);
+                    }
                 }
             }
         } 
         // If it's an identifier, check if next token is 'in' keyword
         else if (loopToken.type == IDENTIFIER) {
             // Consume the identifier (we'll use it later if it's for-in)
-            varName = loopToken.value;
+            std::string keyVarName = loopToken.value;
+            std::string valueVarName;
+            bool isKeyValuePair = false;
+            
             consume(IDENTIFIER);
+            
+            // Check if next token is comma (key-value pair syntax)
+            if (currentToken.type == COMMA) {
+                isKeyValuePair = true;
+                consume(COMMA);
+                valueVarName = currentToken.value;
+                consume(IDENTIFIER);
+            }
             
             // Check if next token is 'in'
             if (currentToken.type == KEYWORD && currentToken.value == "in") {
@@ -834,7 +879,11 @@ Statement* Parser::parseStatement() {
                 auto body = parseBlock();
                 
                 // Create for-in loop statement node
-                return new ForInLoopStatement(varName, collection, body);
+                if (isKeyValuePair) {
+                    return new ForInLoopStatement(keyVarName, valueVarName, collection, body);
+                } else {
+                    return new ForInLoopStatement(keyVarName, collection, body);
+                }
             } else {
                 // It's a traditional for loop with variable assignment
                 // We need to parse i = 1 as initialization
@@ -1241,6 +1290,166 @@ Expression* Parser::parseBinaryExpression() {
 
 // Parse primary expression
 Expression* Parser::parsePrimaryExpression() {
+    // Check for list literal
+    if (currentToken.type == LBRACKET) {
+        int line = currentToken.line;
+        int column = currentToken.column;
+        consume(LBRACKET);
+        
+        auto list = new ListLiteral(line, column);
+        
+        // Parse elements
+        if (currentToken.type != RBRACKET) {
+            // Parse first element
+            list->elements.push_back(parseExpression());
+            
+            // Parse additional elements
+            while (currentToken.type == COMMA) {
+                consume(COMMA);
+                list->elements.push_back(parseExpression());
+            }
+        }
+        
+        consume(RBRACKET);
+        return list;
+    }
+    
+    // Check for hash map literal
+    if (currentToken.type == LBRACE) {
+        int line = currentToken.line;
+        int column = currentToken.column;
+        consume(LBRACE);
+        
+        auto hashMap = new HashMapLiteral(line, column);
+        
+        // Parse entries
+        if (currentToken.type != RBRACE) {
+            // Parse first key (must be string literal)
+            if (currentToken.type == STRING_LITERAL) {
+                // Create string literal without advancing the token
+                std::string tokenValue = currentToken.value;
+                std::string type = "normal";
+                std::string value;
+                
+                // Check for prefix and remove it along with quotes
+                if (tokenValue.size() >= 3 && (tokenValue[0] == 'r' || tokenValue[0] == 'f') && tokenValue[1] == '"') {
+                    // Has prefix
+                    type = (tokenValue[0] == 'r') ? "raw" : "format";
+                    // Remove prefix and quotes
+                    value = tokenValue.substr(2, tokenValue.size() - 3);
+                } else if (tokenValue.size() >= 2) {
+                    // Normal string without prefix
+                    value = tokenValue.substr(1, tokenValue.size() - 2);
+                }
+                
+                // Process escape sequences for non-raw strings
+                if (type != "raw") {
+                    std::string processedValue;
+                    for (size_t i = 0; i < value.size(); ++i) {
+                        if (value[i] == '\\' && i + 1 < value.size()) {
+                            // Handle escape sequences
+                            char nextChar = value[i + 1];
+                            switch (nextChar) {
+                                case 'n': processedValue += '\n'; break;
+                                case 't': processedValue += '\t'; break;
+                                case 'r': processedValue += '\r'; break;
+                                case '"': processedValue += '"'; break;
+                                case '\\': processedValue += '\\'; break;
+                                default: processedValue += nextChar; break;
+                            }
+                            i++; // Skip the next character
+                        } else {
+                            processedValue += value[i];
+                        }
+                    }
+                    value = processedValue;
+                }
+                
+                Expression* key = new StringLiteral(value, type, currentToken.line, currentToken.column);
+                
+                // Advance to next token
+                consume(STRING_LITERAL);
+                
+                // Expect assignment operator
+                consume(ASSIGN);
+                
+                // Parse first value
+                Expression* valueExpr = parseExpression();
+                
+                // Add first entry to hash map
+                hashMap->entries.push_back(new HashMapEntry(key, valueExpr));
+                
+                // Parse additional entries
+                while (currentToken.type == COMMA) {
+                    consume(COMMA);
+                    
+                    // Parse next key (must be string literal)
+                    if (currentToken.type != STRING_LITERAL) {
+                        throw vanction_error::SyntaxError("Expected string literal as hash map key", currentToken.line, currentToken.column);
+                    }
+                    
+                    // Create string literal without using parseStringLiteral function
+                    tokenValue = currentToken.value;
+                    type = "normal";
+                    value.clear();
+                    
+                    // Check for prefix and remove it along with quotes
+                    if (tokenValue.size() >= 3 && (tokenValue[0] == 'r' || tokenValue[0] == 'f') && tokenValue[1] == '"') {
+                        // Has prefix
+                        type = (tokenValue[0] == 'r') ? "raw" : "format";
+                        // Remove prefix and quotes
+                        value = tokenValue.substr(2, tokenValue.size() - 3);
+                    } else if (tokenValue.size() >= 2) {
+                        // Normal string without prefix
+                        value = tokenValue.substr(1, tokenValue.size() - 2);
+                    }
+                    
+                    // Process escape sequences for non-raw strings
+                    if (type != "raw") {
+                        std::string processedValue;
+                        for (size_t i = 0; i < value.size(); ++i) {
+                            if (value[i] == '\\' && i + 1 < value.size()) {
+                                // Handle escape sequences
+                                char nextChar = value[i + 1];
+                                switch (nextChar) {
+                                    case 'n': processedValue += '\n'; break;
+                                    case 't': processedValue += '\t'; break;
+                                    case 'r': processedValue += '\r'; break;
+                                    case '"': processedValue += '"'; break;
+                                    case '\\': processedValue += '\\'; break;
+                                    default: processedValue += nextChar; break;
+                                }
+                                i++; // Skip the next character
+                            } else {
+                                processedValue += value[i];
+                            }
+                        }
+                        value = processedValue;
+                    }
+                    
+                    key = new StringLiteral(value, type, currentToken.line, currentToken.column);
+                    
+                    // Advance to next token
+                    consume(STRING_LITERAL);
+                    
+                    // Expect assignment operator
+                    consume(ASSIGN);
+                    
+                    // Parse next value
+                    valueExpr = parseExpression();
+                    
+                    // Add entry to hash map
+                    hashMap->entries.push_back(new HashMapEntry(key, valueExpr));
+                }
+            } else {
+                throw vanction_error::SyntaxError("Expected string literal as hash map key", currentToken.line, currentToken.column);
+            }
+        }
+        
+        consume(RBRACE);
+        return hashMap;
+    }
+    
     // Check for class method call (e.g., class.method())
     if (currentToken.type == KEYWORD && currentToken.value == "class") {
         // Create an Identifier object for "class"
@@ -1760,20 +1969,40 @@ std::string Parser::tokenTypeToString(TokenType type) {
         case DOT: return "dot";
         case COLON: return "colon";
         case SEMICOLON: return "semicolon";
+        case COMMA: return "comma";
         case LPAREN: return "left parenthesis";
         case RPAREN: return "right parenthesis";
         case LBRACE: return "left brace";
         case RBRACE: return "right brace";
+        case LBRACKET: return "left bracket";
+        case RBRACKET: return "right bracket";
         case ASSIGN: return "assignment operator";
         case PLUS: return "plus operator";
         case MINUS: return "minus operator";
         case MULTIPLY: return "multiply operator";
         case DIVIDE: return "divide operator";
+        case MODULO: return "modulo operator";
         case LSHIFT: return "left shift operator";
         case RSHIFT: return "right shift operator";
         case AND: return "and operator";
         case OR: return "or operator";
         case XOR: return "xor operator";
+        case NOT: return "not operator";
+        case BITWISE_AND: return "bitwise and operator";
+        case BITWISE_OR: return "bitwise or operator";
+        case BITWISE_NOT: return "bitwise not operator";
+        case INCREMENT: return "increment operator";
+        case DECREMENT: return "decrement operator";
+        case PLUS_ASSIGN: return "plus assignment operator";
+        case MINUS_ASSIGN: return "minus assignment operator";
+        case MULTIPLY_ASSIGN: return "multiply assignment operator";
+        case DIVIDE_ASSIGN: return "divide assignment operator";
+        case MODULO_ASSIGN: return "modulo assignment operator";
+        case LSHIFT_ASSIGN: return "left shift assignment operator";
+        case RSHIFT_ASSIGN: return "right shift assignment operator";
+        case AND_ASSIGN: return "and assignment operator";
+        case OR_ASSIGN: return "or assignment operator";
+        case XOR_ASSIGN: return "xor assignment operator";
         case COMMENT: return "comment";
         case EOF_TOKEN: return "end of file";
         case EQUAL: return "equal operator";
