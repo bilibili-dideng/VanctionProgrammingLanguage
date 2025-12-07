@@ -25,11 +25,16 @@ enum TokenType {
     MINUS,
     MULTIPLY,
     DIVIDE,
+    MODULO,
     LSHIFT,
     RSHIFT,
     AND,
     OR,
     XOR,
+    NOT,
+    BITWISE_AND,
+    BITWISE_OR,
+    BITWISE_NOT,
     COMMENT,
     EOF_TOKEN,
     // Comparison operators
@@ -39,6 +44,20 @@ enum TokenType {
     LESS_EQUAL,
     GREATER_THAN,
     GREATER_EQUAL,
+    // Compound assignment operators
+    PLUS_ASSIGN,
+    MINUS_ASSIGN,
+    MULTIPLY_ASSIGN,
+    DIVIDE_ASSIGN,
+    MODULO_ASSIGN,
+    LSHIFT_ASSIGN,
+    RSHIFT_ASSIGN,
+    AND_ASSIGN,
+    OR_ASSIGN,
+    XOR_ASSIGN,
+    // Increment/decrement operators
+    INCREMENT,
+    DECREMENT,
     // Control flow keywords (will be handled as KEYWORD type with specific values)
 }; 
 

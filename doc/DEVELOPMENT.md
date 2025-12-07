@@ -130,11 +130,12 @@ Vanction is a simple compiled programming language that supports compiling to ex
   - undefined
   
 - **Supported Operators**:
-  - Arithmetic operators: +, -, *, /
-  - Bitwise operators: <<, >>
+  - Arithmetic operators: +, -, *, /, %
+  - Bitwise operators: <<, >>, &, |, ^
   - Comparison operators: ==, !=, <, <=, >, >=
-  - Logical operators: AND, OR, XOR
-  - Assignment operator: =
+  - Logical operators: &, |, ^
+  - Assignment operators: =, +=, -=, *=, /=, %=, <<=, >>=, &=, |=, ^=
+  - Increment/decrement operators: ++, --
 
 ## 4. Compilation and Build Process
 

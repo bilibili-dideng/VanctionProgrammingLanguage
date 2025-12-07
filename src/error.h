@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <stdexcept>
 
 // Error type enumeration
 enum class ErrorType {
@@ -16,6 +17,84 @@ enum class ErrorType {
     MainFunctionError,
     UnknownError
 };
+
+// Error namespace containing all specific error classes
+namespace vanction_error {
+    // Base error class for all Vanction errors
+    class VanctionError : public std::runtime_error {
+    public:
+        VanctionError(const std::string& type, const std::string& message, int line = 1, int column = 1)
+            : std::runtime_error(type + ": " + message), type_(type), message_(message), line_(line), column_(column) {}
+        
+        virtual ~VanctionError() = default;
+        
+        const std::string& getType() const { return type_; }
+        const std::string& getMessage() const { return message_; }
+        int getLine() const { return line_; }
+        int getColumn() const { return column_; }
+        
+    private:
+        std::string type_;
+        std::string message_;
+        int line_;
+        int column_;
+    };
+    
+    // Specific error classes
+    class CError : public VanctionError {
+    public:
+        explicit CError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("CError", message, line, column) {}
+    };
+    
+    class MethodError : public VanctionError {
+    public:
+        explicit MethodError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("MethodError", message, line, column) {}
+    };
+    
+    class CompilationError : public VanctionError {
+    public:
+        explicit CompilationError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("CompilationError", message, line, column) {}
+    };
+    
+    class DivideByZeroError : public VanctionError {
+    public:
+        explicit DivideByZeroError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("DivideByZeroError", message, line, column) {}
+    };
+    
+    class ValueError : public VanctionError {
+    public:
+        explicit ValueError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("ValueError", message, line, column) {}
+    };
+    
+    class TokenError : public VanctionError {
+    public:
+        explicit TokenError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("TokenError", message, line, column) {}
+    };
+    
+    class SyntaxError : public VanctionError {
+    public:
+        explicit SyntaxError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("SyntaxError", message, line, column) {}
+    };
+    
+    class MainFunctionError : public VanctionError {
+    public:
+        explicit MainFunctionError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("MainFunctionError", message, line, column) {}
+    };
+    
+    class UnknownError : public VanctionError {
+    public:
+        explicit UnknownError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("UnknownError", message, line, column) {}
+    };
+}
 
 // Error class to represent an error with all relevant information
 class Error {

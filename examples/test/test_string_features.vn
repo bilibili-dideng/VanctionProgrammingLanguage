@@ -1,0 +1,30 @@
+func main() {
+    || Test normal string with escape sequences
+    System.print("Normal string with escape sequences:");
+    System.print("Hello\nWorld!");
+    System.print("Hello\tTabbed\tWorld!");
+    System.print("Backslash: \\ ");
+    System.print("Quote: \"Hello\" ");
+    
+    || Test raw string
+    System.print("\nRaw string (no escape sequences):");
+    System.print(r"Hello\nWorld!");
+    System.print(r"Hello\tTabbed\tWorld!");
+    System.print(r"Backslash: \\ ");
+    System.print(r"Quote: Hello ");
+    
+    || Test formatted string
+    System.print("\nFormatted string:");
+    int abc = 332;
+    System.print(f"abc = {abc}");
+    
+    string name = "Vanction";
+    int version = 1;
+    System.print(f"Welcome to {name} version {version}");
+    
+    float pi = 3.14159;
+    System.print(f"Pi is approximately {pi}");
+    
+    bool isReady = true;
+    System.print(f"Is ready? {isReady}");
+}

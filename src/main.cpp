@@ -134,7 +134,7 @@ std::string getFileNameWithoutExt(const std::string& filePath) {
 // Type for variable values - extended to include Instance* for objects
 // Forward declaration for Instance type
 class Instance;
-using Value = std::variant<int, char, std::string, bool, float, double, std::monostate, Instance*>;
+using Value = std::variant<int, char, std::string, bool, float, double, std::monostate, Instance*, ErrorObject*>;
 
 // Class definition structure
 struct ClassDefinition {
@@ -280,6 +280,54 @@ Value executeFunctionDeclaration(FunctionDeclaration* func) {
     return std::monostate{};
 }
 
+// Execute if statement
+Value executeIfStatement(IfStatement* stmt, bool* shouldReturn) {
+    // Evaluate condition
+    Value conditionValue = executeExpression(stmt->condition);
+    
+    // Convert condition to boolean
+    bool condition = false;
+    if (std::holds_alternative<bool>(conditionValue)) {
+        condition = std::get<bool>(conditionValue);
+    } else if (std::holds_alternative<int>(conditionValue)) {
+        condition = (std::get<int>(conditionValue) != 0);
+    } else if (std::holds_alternative<float>(conditionValue)) {
+        condition = (std::get<float>(conditionValue) != 0.0f);
+    } else if (std::holds_alternative<double>(conditionValue)) {
+        condition = (std::get<double>(conditionValue) != 0.0);
+    } else if (std::holds_alternative<std::string>(conditionValue)) {
+        condition = !std::get<std::string>(conditionValue).empty();
+    }
+    
+    // Execute if body if condition is true
+    if (condition) {
+        for (auto bodyStmt : stmt->ifBody) {
+            Value result = executeStatement(bodyStmt, shouldReturn);
+            if (shouldReturn && *shouldReturn) {
+                return result;
+            }
+        }
+    } else {
+        // Check else-if clauses
+        for (auto elseIf : stmt->elseIfs) {
+            Value result = executeIfStatement(elseIf, shouldReturn);
+            if (shouldReturn && *shouldReturn) {
+                return result;
+            }
+        }
+        
+        // Execute else body if no else-if matched
+        for (auto bodyStmt : stmt->elseBody) {
+            Value result = executeStatement(bodyStmt, shouldReturn);
+            if (shouldReturn && *shouldReturn) {
+                return result;
+            }
+        }
+    }
+    
+    return std::monostate{};
+}
+
 // Execute statement
 Value executeStatement(ASTNode* stmt, bool* shouldReturn) {
     if (auto comment = dynamic_cast<Comment*>(stmt)) {
@@ -299,6 +347,9 @@ Value executeStatement(ASTNode* stmt, bool* shouldReturn) {
             variables[varDecl->name] = std::monostate{};
         }
         return std::monostate{};
+    } else if (auto ifStmt = dynamic_cast<IfStatement*>(stmt)) {
+        // Execute if statement
+        return executeIfStatement(ifStmt, shouldReturn);
     } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
         // Execute return expression if it exists
         Value result = std::monostate{};
@@ -310,6 +361,65 @@ Value executeStatement(ASTNode* stmt, bool* shouldReturn) {
             *shouldReturn = true;
         }
         return result;
+    } else if (auto tryHappenStmt = dynamic_cast<TryHappenStatement*>(stmt)) {
+        // Execute try-happen statement
+        try {
+            // Execute try body
+            for (auto tryStmt : tryHappenStmt->tryBody) {
+                bool tryShouldReturn = false;
+                Value tryResult = executeStatement(tryStmt, &tryShouldReturn);
+                if (tryShouldReturn) {
+                    return tryResult;
+                }
+            }
+        } catch (const vanction_error::VanctionError& e) {
+            // Check if error type matches
+            if (tryHappenStmt->errorType == e.getType() || tryHappenStmt->errorType == "Error") {
+                // Create error object
+                auto errorObj = new ErrorObject(e.what(), e.getType(), e.getMessage());
+                
+                // Store error object in variable
+                variables[tryHappenStmt->errorVariableName] = errorObj;
+                
+                // Execute happen body
+                for (auto happenStmt : tryHappenStmt->happenBody) {
+                    bool happenShouldReturn = false;
+                    Value happenResult = executeStatement(happenStmt, &happenShouldReturn);
+                    if (happenShouldReturn) {
+                        return happenResult;
+                    }
+                }
+            } else {
+                // Re-throw if error type doesn't match
+                throw;
+            }
+        } catch (const std::exception& e) {
+            // Handle other exceptions
+            if (tryHappenStmt->errorType == "CError" || tryHappenStmt->errorType == "Error") {
+                // Create error object
+                std::string errorMsg = e.what();
+                std::string errorType = "CError";
+                
+                // Create error object
+                auto errorObj = new ErrorObject(errorMsg, errorType, errorMsg);
+                
+                // Store error object in variable
+                variables[tryHappenStmt->errorVariableName] = errorObj;
+                
+                // Execute happen body
+                for (auto happenStmt : tryHappenStmt->happenBody) {
+                    bool happenShouldReturn = false;
+                    Value happenResult = executeStatement(happenStmt, &happenShouldReturn);
+                    if (happenShouldReturn) {
+                        return happenResult;
+                    }
+                }
+            } else {
+                // Re-throw if error type doesn't match
+                throw;
+            }
+        }
+        return std::monostate{};
     } else if (auto funcDecl = dynamic_cast<FunctionDeclaration*>(stmt)) {
         // Execute nested function declaration
         return executeFunctionDeclaration(funcDecl);
@@ -335,7 +445,7 @@ Value executeExpression(Expression* expr) {
             Value instanceVal = executeExpression(instanceAccess->instance);
             
             if (!std::holds_alternative<Instance*>(instanceVal)) {
-                throw std::runtime_error("Cannot assign to property of non-instance");
+                throw vanction_error::MethodError("Cannot assign to property of non-instance");
             }
             
             Instance* instance = std::get<Instance*>(instanceVal);
@@ -354,12 +464,12 @@ Value executeExpression(Expression* expr) {
                         
                         // Get the instance from the variables environment
                         if (variables.find("instance") == variables.end()) {
-                            throw std::runtime_error("Instance variable not found in current context");
+                            throw vanction_error::MethodError("Instance variable not found in current context");
                         }
                         
                         Value instanceVal = variables["instance"];
                         if (!std::holds_alternative<Instance*>(instanceVal)) {
-                            throw std::runtime_error("instance variable is not an Instance*");
+                            throw vanction_error::MethodError("instance variable is not an Instance*");
                         }
                         
                         Instance* instance = std::get<Instance*>(instanceVal);
@@ -418,7 +528,7 @@ Value executeExpression(Expression* expr) {
         }
         
         // Handle logical operations specially
-        if (binaryExpr->op == "AND" || binaryExpr->op == "OR" || binaryExpr->op == "XOR") {
+        if (binaryExpr->op == "&" || binaryExpr->op == "|" || binaryExpr->op == "^") {
             auto getBool = [](Value val) -> bool {
                 if (std::holds_alternative<bool>(val)) {
                     return std::get<bool>(val);
@@ -436,64 +546,140 @@ Value executeExpression(Expression* expr) {
             bool leftBool = getBool(leftVal);
             bool rightBool = getBool(rightVal);
             
-            if (binaryExpr->op == "AND") {
+            if (binaryExpr->op == "&") {
                 return leftBool && rightBool;
-            } else if (binaryExpr->op == "OR") {
+            } else if (binaryExpr->op == "|") {
                 return leftBool || rightBool;
-            } else if (binaryExpr->op == "XOR") {
+            } else if (binaryExpr->op == "^") {
                 return leftBool != rightBool;
             }
         }
         
-        // Handle numeric operations
-        auto getNumber = [](Value val) -> double {
-            if (std::holds_alternative<int>(val)) {
-                return static_cast<double>(std::get<int>(val));
-            } else if (std::holds_alternative<bool>(val)) {
-                return static_cast<double>(std::get<bool>(val));
-            } else if (std::holds_alternative<float>(val)) {
-                return static_cast<double>(std::get<float>(val));
-            } else if (std::holds_alternative<double>(val)) {
-                return std::get<double>(val);
+        // Handle comparison operators
+        if (binaryExpr->op == "==" || binaryExpr->op == "!=") {
+            // Handle string comparisons
+            if (std::holds_alternative<std::string>(leftVal) && std::holds_alternative<std::string>(rightVal)) {
+                std::string leftStr = std::get<std::string>(leftVal);
+                std::string rightStr = std::get<std::string>(rightVal);
+                
+                if (binaryExpr->op == "==") {
+                    return (leftStr == rightStr);
+                } else {
+                    return (leftStr != rightStr);
+                }
+            }
+            
+            // Handle numeric comparisons
+            auto getNumber = [](Value val) -> double {
+                if (std::holds_alternative<int>(val)) {
+                    return static_cast<double>(std::get<int>(val));
+                } else if (std::holds_alternative<bool>(val)) {
+                    return static_cast<double>(std::get<bool>(val));
+                } else if (std::holds_alternative<float>(val)) {
+                    return static_cast<double>(std::get<float>(val));
+                } else if (std::holds_alternative<double>(val)) {
+                    return std::get<double>(val);
+                } else if (std::holds_alternative<char>(val)) {
+                    return static_cast<double>(std::get<char>(val));
+                } else {
+                    throw vanction_error::ValueError("Cannot convert to number");
+                }
+            };
+            
+            double leftNum = getNumber(leftVal);
+            double rightNum = getNumber(rightVal);
+            
+            if (binaryExpr->op == "==") {
+                return (leftNum == rightNum);
             } else {
-                throw std::runtime_error("Cannot convert to number");
+                return (leftNum != rightNum);
             }
-        };
-        
-        double leftNum = getNumber(leftVal);
-        double rightNum = getNumber(rightVal);
-        double result = 0.0;
-        
-        if (binaryExpr->op == "+") {
-            result = leftNum + rightNum;
-        } else if (binaryExpr->op == "-") {
-            result = leftNum - rightNum;
-        } else if (binaryExpr->op == "*") {
-            result = leftNum * rightNum;
-        } else if (binaryExpr->op == "/") {
-            // Check for division by zero
-            if (rightNum == 0.0) {
-                throw std::runtime_error("Division by zero");
+        } else if (binaryExpr->op == "<" || binaryExpr->op == "<=" || binaryExpr->op == ">" || binaryExpr->op == ">=") {
+            // Handle all comparison operators
+            auto getNumber = [](Value val) -> double {
+                if (std::holds_alternative<int>(val)) {
+                    return static_cast<double>(std::get<int>(val));
+                } else if (std::holds_alternative<bool>(val)) {
+                    return static_cast<double>(std::get<bool>(val));
+                } else if (std::holds_alternative<float>(val)) {
+                    return static_cast<double>(std::get<float>(val));
+                } else if (std::holds_alternative<double>(val)) {
+                    return std::get<double>(val);
+                } else if (std::holds_alternative<char>(val)) {
+                    return static_cast<double>(std::get<char>(val));
+                } else {
+                    throw std::runtime_error("Cannot convert to number");
+                }
+            };
+            
+            double leftNum = getNumber(leftVal);
+            double rightNum = getNumber(rightVal);
+            
+            if (binaryExpr->op == "<") {
+                return (leftNum < rightNum);
+            } else if (binaryExpr->op == "<=") {
+                return (leftNum <= rightNum);
+            } else if (binaryExpr->op == ">") {
+                return (leftNum > rightNum);
+            } else {
+                return (leftNum >= rightNum);
             }
-            result = leftNum / rightNum;
-        } else if (binaryExpr->op == "<<") {
-            // Bit shift operations - cast to int
-            result = static_cast<double>(static_cast<int>(leftNum) << static_cast<int>(rightNum));
-        } else if (binaryExpr->op == ">>") {
-            // Bit shift operations - cast to int
-            result = static_cast<double>(static_cast<int>(leftNum) >> static_cast<int>(rightNum));
-        }
-        
-        // Determine result type based on operands
-        if (std::holds_alternative<int>(leftVal) && std::holds_alternative<int>(rightVal)) {
-            // Both operands are integers - result is integer
-            return static_cast<int>(result);
-        } else if (std::holds_alternative<float>(leftVal) || std::holds_alternative<float>(rightVal)) {
-            // At least one float operand - result is float
-            return static_cast<float>(result);
         } else {
-            // Default to double
-            return result;
+            // Handle numeric operations
+            auto getNumber = [](Value val) -> double {
+                if (std::holds_alternative<int>(val)) {
+                    return static_cast<double>(std::get<int>(val));
+                } else if (std::holds_alternative<bool>(val)) {
+                    return static_cast<double>(std::get<bool>(val));
+                } else if (std::holds_alternative<float>(val)) {
+                    return static_cast<double>(std::get<float>(val));
+                } else if (std::holds_alternative<double>(val)) {
+                    return std::get<double>(val);
+                } else if (std::holds_alternative<char>(val)) {
+                    return static_cast<double>(std::get<char>(val));
+                } else {
+                    throw std::runtime_error("Cannot convert to number");
+                }
+            };
+            
+            double leftNum = getNumber(leftVal);
+            double rightNum = getNumber(rightVal);
+            double result = 0.0;
+            
+            if (binaryExpr->op == "+") {
+                result = leftNum + rightNum;
+            } else if (binaryExpr->op == "-") {
+                result = leftNum - rightNum;
+            } else if (binaryExpr->op == "*") {
+                result = leftNum * rightNum;
+            } else if (binaryExpr->op == "/") {
+                // Check for division by zero
+                if (rightNum == 0.0) {
+                    throw vanction_error::DivideByZeroError("Division by zero", binaryExpr->getLine(), binaryExpr->getColumn());
+                }
+                result = leftNum / rightNum;
+            } else if (binaryExpr->op == "<<") {
+                // Bit shift operations - cast to int
+                result = static_cast<double>(static_cast<int>(leftNum) << static_cast<int>(rightNum));
+            } else if (binaryExpr->op == ">>") {
+                // Bit shift operations - cast to int
+                result = static_cast<double>(static_cast<int>(leftNum) >> static_cast<int>(rightNum));
+            } else if (binaryExpr->op == "%") {
+                // Modulo operation - cast to int
+                result = static_cast<double>(static_cast<int>(leftNum) % static_cast<int>(rightNum));
+            }
+            
+            // Determine result type based on operands
+            if (std::holds_alternative<int>(leftVal) && std::holds_alternative<int>(rightVal)) {
+                // Both operands are integers - result is integer
+                return static_cast<int>(result);
+            } else if (std::holds_alternative<float>(leftVal) || std::holds_alternative<float>(rightVal)) {
+                // At least one float operand - result is float
+                return static_cast<float>(result);
+            } else {
+                // Default to double
+                return result;
+            }
         }
     } else if (auto instanceCreation = dynamic_cast<InstanceCreationExpression*>(expr)) {
         // Create new instance
@@ -505,7 +691,7 @@ Value executeExpression(Expression* expr) {
         
         // Check if class exists
         if (classes.find(className) == classes.end()) {
-            throw std::runtime_error("Undefined class: " + className);
+            throw vanction_error::MethodError("Undefined class: " + className);
         }
         
         // Create instance
@@ -607,48 +793,70 @@ Value executeExpression(Expression* expr) {
         // Get instance
         Value instanceVal = executeExpression(instanceAccess->instance);
         
-        if (!std::holds_alternative<Instance*>(instanceVal)) {
-            throw std::runtime_error("Cannot access property of non-instance");
-        }
-        
-        Instance* instance = std::get<Instance*>(instanceVal);
-        std::string memberName = instanceAccess->memberName;
-        
-        if (debugMode) {
-            std::cout << "[DEBUG] Instance variable access: " << memberName << " on instance of class " << instance->cls->name << std::endl;
-        }
-        
-        // Instance variable access
-        if (instance->instanceVariables.find(memberName) != instance->instanceVariables.end()) {
-            Value result = instance->instanceVariables[memberName];
+        // Check if it's an Instance*
+        if (std::holds_alternative<Instance*>(instanceVal)) {
+            Instance* instance = std::get<Instance*>(instanceVal);
+            std::string memberName = instanceAccess->memberName;
+            
             if (debugMode) {
-                std::cout << "[DEBUG] Found variable " << memberName << " with value: ";
-                if (std::holds_alternative<std::string>(result)) {
-                    std::cout << "string='" << std::get<std::string>(result) << "'";
-                } else if (std::holds_alternative<int>(result)) {
-                    std::cout << "int=" << std::get<int>(result);
-                } else if (std::holds_alternative<float>(result)) {
-                    std::cout << "float=" << std::get<float>(result);
-                } else if (std::holds_alternative<double>(result)) {
-                    std::cout << "double=" << std::get<double>(result);
-                } else if (std::holds_alternative<bool>(result)) {
-                    std::cout << "bool=" << (std::get<bool>(result) ? "true" : "false");
-                } else if (std::holds_alternative<Instance*>(result)) {
-                    std::cout << "instance";
-                } else if (std::holds_alternative<std::monostate>(result)) {
-                    std::cout << "undefined";
-                } else {
-                    std::cout << "other type";
+                std::cout << "[DEBUG] Instance variable access: " << memberName << " on instance of class " << instance->cls->name << std::endl;
+            }
+            
+            // Instance variable access
+            if (instance->instanceVariables.find(memberName) != instance->instanceVariables.end()) {
+                Value result = instance->instanceVariables[memberName];
+                if (debugMode) {
+                    std::cout << "[DEBUG] Found variable " << memberName << " with value: ";
+                    if (std::holds_alternative<std::string>(result)) {
+                        std::cout << "string='" << std::get<std::string>(result) << "'";
+                    } else if (std::holds_alternative<int>(result)) {
+                        std::cout << "int=" << std::get<int>(result);
+                    } else if (std::holds_alternative<float>(result)) {
+                        std::cout << "float=" << std::get<float>(result);
+                    } else if (std::holds_alternative<double>(result)) {
+                        std::cout << "double=" << std::get<double>(result);
+                    } else if (std::holds_alternative<bool>(result)) {
+                        std::cout << "bool=" << (std::get<bool>(result) ? "true" : "false");
+                    } else if (std::holds_alternative<Instance*>(result)) {
+                        std::cout << "instance";
+                    } else if (std::holds_alternative<std::monostate>(result)) {
+                        std::cout << "undefined";
+                    } else if (std::holds_alternative<ErrorObject*>(result)) {
+                        std::cout << "errorobject";
+                    } else {
+                        std::cout << "other type";
+                    }
+                    std::cout << std::endl;
                 }
-                std::cout << std::endl;
+                return result;
+            } else {
+                // Return undefined if variable doesn't exist
+                if (debugMode) {
+                    std::cout << "[DEBUG] Variable " << memberName << " not found, returning undefined" << std::endl;
+                }
+                return std::monostate{};
             }
-            return result;
-        } else {
-            // Return undefined if variable doesn't exist
-            if (debugMode) {
-                std::cout << "[DEBUG] Variable " << memberName << " not found, returning undefined" << std::endl;
+        } 
+        // Check if it's an ErrorObject*
+        else if (std::holds_alternative<ErrorObject*>(instanceVal)) {
+            ErrorObject* errorObj = std::get<ErrorObject*>(instanceVal);
+            std::string memberName = instanceAccess->memberName;
+            
+            // Access ErrorObject properties
+            if (memberName == "text") {
+                return errorObj->text;
+            } else if (memberName == "type") {
+                return errorObj->type;
+            } else if (memberName == "info") {
+                return errorObj->info;
+            } else {
+                // Return undefined if property doesn't exist
+                return std::monostate{};
             }
-            return std::monostate{};
+        } 
+        // Not an instance or error object
+        else {
+            throw vanction_error::MethodError("Cannot access property of non-instance");
         }
     } else if (auto ident = dynamic_cast<Identifier*>(expr)) {
         // Get variable value
@@ -672,10 +880,67 @@ Value executeExpression(Expression* expr) {
         return charLit->value;
     } else if (auto stringLit = dynamic_cast<StringLiteral*>(expr)) {
         // String literal
-        return stringLit->value;
+        if (stringLit->type == "format") {
+            // Process formatted string
+            std::string formatted = stringLit->value;
+            size_t pos = 0;
+            while ((pos = formatted.find('{', pos)) != std::string::npos) {
+                // Check if it's already escaped
+                if (pos > 0 && formatted[pos - 1] == '\\') {
+                    // Skip escaped brace
+                    pos += 2;
+                    continue;
+                }
+                
+                // Find closing brace
+                size_t endPos = formatted.find('}', pos + 1);
+                if (endPos == std::string::npos) {
+                    // No closing brace, just continue
+                    pos += 1;
+                    continue;
+                }
+                
+                // Extract variable name
+                std::string varName = formatted.substr(pos + 1, endPos - pos - 1);
+                
+                // Get variable value
+                std::string varValue;
+                if (variables.find(varName) != variables.end()) {
+                    Value val = variables[varName];
+                    if (std::holds_alternative<std::string>(val)) {
+                        varValue = std::get<std::string>(val);
+                    } else if (std::holds_alternative<int>(val)) {
+                        varValue = std::to_string(std::get<int>(val));
+                    } else if (std::holds_alternative<float>(val)) {
+                        varValue = std::to_string(std::get<float>(val));
+                    } else if (std::holds_alternative<double>(val)) {
+                        varValue = std::to_string(std::get<double>(val));
+                    } else if (std::holds_alternative<bool>(val)) {
+                        varValue = std::get<bool>(val) ? "true" : "false";
+                    } else {
+                        varValue = "undefined";
+                    }
+                } else {
+                    varValue = "undefined";
+                }
+                
+                // Replace {var} with its value
+                formatted.replace(pos, endPos - pos + 1, varValue);
+                
+                // Move past the replaced text
+                pos += varValue.length();
+            }
+            return formatted;
+        } else {
+            // Normal or raw string
+            return stringLit->value;
+        }
     } else if (auto boolLit = dynamic_cast<BooleanLiteral*>(expr)) {
         // Boolean literal
         return boolLit->value;
+    } else if (auto errorObj = dynamic_cast<ErrorObject*>(expr)) {
+        // Error object - return itself as a value
+        return errorObj;
     }
     
     // Default return value
@@ -728,6 +993,15 @@ Value executeFunctionCall(FunctionCall* call) {
         std::string input;
         std::getline(std::cin, input);
         
+        // Trim whitespace from input
+        size_t start = input.find_first_not_of(" \t\n\r");
+        size_t end = input.find_last_not_of(" \t\n\r");
+        if (start != std::string::npos && end != std::string::npos) {
+            input = input.substr(start, end - start + 1);
+        } else {
+            input = "";
+        }
+        
         // Return input as string
         return input;
     } else if (call->objectName == "type") {
@@ -753,7 +1027,7 @@ Value executeFunctionCall(FunctionCall* call) {
                 try {
                     return std::stoi(std::get<std::string>(arg));
                 } catch (...) {
-                    throw std::runtime_error("Cannot convert string to int");
+                    throw vanction_error::ValueError("Cannot convert string to int");
                 }
             }
         } else if (call->methodName == "float") {
@@ -771,7 +1045,7 @@ Value executeFunctionCall(FunctionCall* call) {
                 try {
                     return std::stof(std::get<std::string>(arg));
                 } catch (...) {
-                    throw std::runtime_error("Cannot convert string to float");
+                    throw vanction_error::ValueError("Cannot convert string to float");
                 }
             }
         } else if (call->methodName == "double") {
@@ -789,7 +1063,26 @@ Value executeFunctionCall(FunctionCall* call) {
                 try {
                     return std::stod(std::get<std::string>(arg));
                 } catch (...) {
-                    throw std::runtime_error("Cannot convert string to double");
+                    throw vanction_error::ValueError("Cannot convert string to double");
+                }
+            }
+        } else if (call->methodName == "char") {
+            // Convert to char
+            if (std::holds_alternative<char>(arg)) {
+                return arg;
+            } else if (std::holds_alternative<int>(arg)) {
+                return static_cast<char>(std::get<int>(arg));
+            } else if (std::holds_alternative<float>(arg)) {
+                return static_cast<char>(std::get<float>(arg));
+            } else if (std::holds_alternative<double>(arg)) {
+                return static_cast<char>(std::get<double>(arg));
+            } else if (std::holds_alternative<std::string>(arg)) {
+                // Get first character of string
+                const std::string& str = std::get<std::string>(arg);
+                if (!str.empty()) {
+                    return str[0];
+                } else {
+                    return '\0'; // Return null character for empty string
                 }
             }
         } else if (call->methodName == "string") {
@@ -814,7 +1107,7 @@ Value executeFunctionCall(FunctionCall* call) {
         
         // Check if function exists
         if (functions.find(funcName) == functions.end()) {
-            throw std::runtime_error("Undefined function: " + funcName);
+            throw vanction_error::MethodError("Undefined function: " + funcName);
         }
         
         FunctionDeclaration* func = functions[funcName];
@@ -824,7 +1117,7 @@ Value executeFunctionCall(FunctionCall* call) {
         
         // Handle function arguments
         if (call->arguments.size() != func->parameters.size()) {
-            throw std::runtime_error("Function " + funcName + " expects " + std::to_string(func->parameters.size()) + " arguments, but got " + std::to_string(call->arguments.size()));
+            throw vanction_error::MethodError("Function " + funcName + " expects " + std::to_string(func->parameters.size()) + " arguments, but got " + std::to_string(call->arguments.size()));
         }
         
         // Assign argument values to parameters
@@ -857,7 +1150,7 @@ Value executeFunctionCall(FunctionCall* call) {
             std::string methodName = call->methodName;
             
             if (classes.find(className) == classes.end()) {
-                throw std::runtime_error("Undefined class: " + className);
+                throw vanction_error::MethodError("Undefined class: " + className);
             }
             
             ClassDefinition* classDef = classes[className];
@@ -872,7 +1165,7 @@ Value executeFunctionCall(FunctionCall* call) {
             }
             
             if (!method) {
-                throw std::runtime_error("Undefined class method: " + methodName + " on class " + className);
+                throw vanction_error::MethodError("Undefined class method: " + methodName + " on class " + className);
             }
             
             // Save current variable environment
@@ -900,7 +1193,7 @@ Value executeFunctionCall(FunctionCall* call) {
             Value instanceVal = variables[call->objectName];
             
             if (!std::holds_alternative<Instance*>(instanceVal)) {
-                throw std::runtime_error("Cannot call method on non-instance: " + call->objectName);
+                throw vanction_error::MethodError("Cannot call method on non-instance: " + call->objectName);
             }
             
             Instance* instance = std::get<Instance*>(instanceVal);
@@ -951,7 +1244,7 @@ Value executeFunctionCall(FunctionCall* call) {
             }
             
             if (!method) {
-                throw std::runtime_error("Undefined method: " + methodName + " on instance of " + instance->cls->name);
+                throw vanction_error::MethodError("Undefined method: " + methodName + " on instance of " + instance->cls->name);
             }
             
             // Create a new variable environment for the method execution
@@ -971,7 +1264,7 @@ Value executeFunctionCall(FunctionCall* call) {
             bool isInitMethod = (methodName == "init" || methodName == "__init__");
             size_t expectedArgs = isInitMethod ? (method->parameters.size() > 0 ? method->parameters.size() - 1 : 0) : method->parameters.size();
             if (call->arguments.size() != expectedArgs) {
-                throw std::runtime_error("Method " + methodName + " expects " + std::to_string(expectedArgs) + " arguments, but got " + std::to_string(call->arguments.size()));
+                throw vanction_error::MethodError("Method " + methodName + " expects " + std::to_string(expectedArgs) + " arguments, but got " + std::to_string(call->arguments.size()));
             }
             
             // Assign argument values to parameters, starting from index 1 if there are parameters
@@ -1020,12 +1313,12 @@ Value executeFunctionCall(FunctionCall* call) {
                 if (methodName == "init") {
                     // Get the instance from the first argument
                     if (call->arguments.empty()) {
-                        throw std::runtime_error("Init method requires an instance argument");
+                        throw vanction_error::MethodError("Init method requires an instance argument");
                     }
                     
                     Value instanceVal = executeExpression(call->arguments[0]);
                     if (!std::holds_alternative<Instance*>(instanceVal)) {
-                        throw std::runtime_error("First argument to init must be an instance");
+                        throw vanction_error::MethodError("First argument to init must be an instance");
                     }
                     
                     Instance* instance = std::get<Instance*>(instanceVal);
@@ -1033,7 +1326,7 @@ Value executeFunctionCall(FunctionCall* call) {
                     // Find the init method
                     InstanceMethodDeclaration* method = classDef->initMethod;
                     if (!method) {
-                        throw std::runtime_error("Undefined method: init on class " + className);
+                        throw vanction_error::MethodError("Undefined method: init on class " + className);
                     }
                     
                     // Create a new variable environment for the method execution
@@ -1082,12 +1375,12 @@ Value executeFunctionCall(FunctionCall* call) {
             
             // Check if namespace exists
             if (namespaces.find(namespaceName) == namespaces.end()) {
-                throw std::runtime_error("Undefined namespace: " + namespaceName);
+                throw vanction_error::MethodError("Undefined namespace: " + namespaceName);
             }
             
             // Check if function exists in namespace
             if (namespaces[namespaceName].find(funcName) == namespaces[namespaceName].end()) {
-                throw std::runtime_error("Undefined function in namespace " + namespaceName + ": " + funcName);
+                throw vanction_error::MethodError("Undefined function in namespace " + namespaceName + ": " + funcName);
             }
             
             FunctionDeclaration* func = namespaces[namespaceName][funcName];
@@ -1097,7 +1390,7 @@ Value executeFunctionCall(FunctionCall* call) {
             
             // Handle function arguments
             if (call->arguments.size() != func->parameters.size()) {
-                throw std::runtime_error("Function " + namespaceName + ":" + funcName + " expects " + std::to_string(func->parameters.size()) + " arguments, but got " + std::to_string(call->arguments.size()));
+                throw vanction_error::MethodError("Function " + namespaceName + ":" + funcName + " expects " + std::to_string(func->parameters.size()) + " arguments, but got " + std::to_string(call->arguments.size()));
             }
             
             // Assign argument values to parameters
@@ -1403,7 +1696,7 @@ int main(int argc, char* argv[]) {
             // Generate AST
             auto program = parser.parseProgramAST();
             if (!program) {
-                throw std::runtime_error("AST generation failed");
+                throw vanction_error::SyntaxError("AST generation failed");
             }
             
             if (debugMode) {
@@ -1460,6 +1753,9 @@ int main(int argc, char* argv[]) {
                 Error error(ErrorType::CompilationError, "GCC compilation failed", filePath, 1, 1);
                 errorReporter.report(error);
                 std::cout << "Generated C++ code preserved at: " << cppFile << std::endl;
+                // Clean up temporary file
+                std::remove(cppFile.c_str());
+                std::cout << "Cleaned up temporary files" << std::endl;
                 delete program;
                 return 1;
             }
@@ -1476,7 +1772,7 @@ int main(int argc, char* argv[]) {
             // Generate AST
             auto program = parser.parseProgramAST();
             if (!program) {
-                throw std::runtime_error("AST generation failed");
+                throw vanction_error::SyntaxError("AST generation failed");
             }
             
             if (debugMode) {
@@ -1525,12 +1821,42 @@ int main(int argc, char* argv[]) {
             // Default exit code
             return 0;
         }
+    } catch (const vanction_error::VanctionError& e) {
+        // Read file content again for error reporting
+        std::string sourceCode = readFile(filePath);
+        ErrorReporter errorReporter(sourceCode, filePath);
+        
+        // Determine error type from the exception object
+        ErrorType errorType = ErrorType::UnknownError;
+        
+        if (e.getType() == "CError") {
+            errorType = ErrorType::CError;
+        } else if (e.getType() == "MethodError") {
+            errorType = ErrorType::MethodError;
+        } else if (e.getType() == "CompilationError") {
+            errorType = ErrorType::CompilationError;
+        } else if (e.getType() == "DivideByZeroError") {
+            errorType = ErrorType::DivideByZeroError;
+        } else if (e.getType() == "ValueError") {
+            errorType = ErrorType::ValueError;
+        } else if (e.getType() == "TokenError") {
+            errorType = ErrorType::TokenError;
+        } else if (e.getType() == "SyntaxError") {
+            errorType = ErrorType::SyntaxError;
+        } else if (e.getType() == "MainFunctionError") {
+            errorType = ErrorType::MainFunctionError;
+        }
+        
+        // Create and report error
+        Error error(errorType, e.getMessage(), filePath, e.getLine(), e.getColumn());
+        errorReporter.report(error);
+        return 1;
     } catch (const std::runtime_error& e) {
         // Read file content again for error reporting
         std::string sourceCode = readFile(filePath);
         ErrorReporter errorReporter(sourceCode, filePath);
         
-        // Determine error type based on error message
+        // Determine error type based on error message (fallback for old-style errors)
         std::string errorMsg = e.what();
         ErrorType errorType = ErrorType::UnknownError;
         

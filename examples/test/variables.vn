@@ -1,0 +1,7 @@
+func main() {
+    auto x = 5;
+    auto y = 10;
+    auto sum = x + y;
+    System.print(sum);
+    return sum;
+}

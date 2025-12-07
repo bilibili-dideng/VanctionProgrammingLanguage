@@ -1,0 +1,19 @@
+func main() {
+    auto count = 0;
+    auto sum = 0;
+    
+    while (count < 5) {
+        sum = sum + count;
+        count = count + 1;
+    }
+    
+    System.print(sum);
+    
+    if (sum > 5) {
+        System.print("Sum is greater than 5");
+    } else {
+        System.print("Sum is less than or equal to 5");
+    }
+    
+    return sum;
+}

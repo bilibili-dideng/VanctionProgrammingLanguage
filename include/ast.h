@@ -7,7 +7,15 @@
 // AST node base class
 class ASTNode {
 public:
+    ASTNode(int line = 1, int column = 1) : line(line), column(column) {}
     virtual ~ASTNode() = default;
+    
+    int getLine() const { return line; }
+    int getColumn() const { return column; }
+    
+private:
+    int line;
+    int column;
 };
 
 // Function parameter
@@ -40,6 +48,7 @@ public:
 // Statement node base class
 class Statement : public ASTNode {
 public:
+    Statement(int line = 1, int column = 1) : ASTNode(line, column) {}
     virtual ~Statement() = default;
 };
 
@@ -55,6 +64,7 @@ public:
 // Expression node base class
 class Expression : public ASTNode {
 public:
+    Expression(int line = 1, int column = 1) : ASTNode(line, column) {}
     virtual ~Expression() = default;
 };
 
@@ -63,8 +73,8 @@ class Identifier : public Expression {
 public:
     std::string name;
     
-    Identifier(const std::string& name)
-        : name(name) {}
+    Identifier(const std::string& name, int line = 1, int column = 1)
+        : Expression(line, column), name(name) {}
 };
 
 // Integer literal expression
@@ -72,8 +82,8 @@ class IntegerLiteral : public Expression {
 public:
     int value;
     
-    IntegerLiteral(int value)
-        : value(value) {}
+    IntegerLiteral(int value, int line = 1, int column = 1)
+        : Expression(line, column), value(value) {}
 };
 
 // Float literal expression
@@ -81,8 +91,8 @@ class FloatLiteral : public Expression {
 public:
     float value;
     
-    FloatLiteral(float value)
-        : value(value) {}
+    FloatLiteral(float value, int line = 1, int column = 1)
+        : Expression(line, column), value(value) {}
 };
 
 // Double literal expression
@@ -90,8 +100,8 @@ class DoubleLiteral : public Expression {
 public:
     double value;
     
-    DoubleLiteral(double value)
-        : value(value) {}
+    DoubleLiteral(double value, int line = 1, int column = 1)
+        : Expression(line, column), value(value) {}
 };
 
 // Char literal expression
@@ -99,8 +109,8 @@ class CharLiteral : public Expression {
 public:
     char value;
     
-    CharLiteral(char value)
-        : value(value) {}
+    CharLiteral(char value, int line = 1, int column = 1)
+        : Expression(line, column), value(value) {}
 };
 
 // Boolean literal expression
@@ -108,17 +118,18 @@ class BooleanLiteral : public Expression {
 public:
     bool value;
     
-    BooleanLiteral(bool value)
-        : value(value) {}
+    BooleanLiteral(bool value, int line = 1, int column = 1)
+        : Expression(line, column), value(value) {}
 };
 
 // String literal expression
 class StringLiteral : public Expression {
 public:
     std::string value;
+    std::string type; // "normal", "raw", "format"
     
-    StringLiteral(const std::string& value)
-        : value(value) {}
+    StringLiteral(const std::string& value, const std::string& type = "normal", int line = 1, int column = 1)
+        : Expression(line, column), value(value), type(type) {}
 };
 
 // Function call expression
@@ -128,8 +139,8 @@ public:
     std::string methodName;
     std::vector<Expression*> arguments;
     
-    FunctionCall(const std::string& objectName, const std::string& methodName)
-        : objectName(objectName), methodName(methodName) {}
+    FunctionCall(const std::string& objectName, const std::string& methodName, int line = 1, int column = 1)
+        : Expression(line, column), objectName(objectName), methodName(methodName) {}
     
     ~FunctionCall() {
         for (auto arg : arguments) {
@@ -164,8 +175,8 @@ public:
     std::string op;
     Expression* right;
     
-    BinaryExpression(Expression* left, const std::string& op, Expression* right)
-        : left(left), op(op), right(right) {}
+    BinaryExpression(Expression* left, const std::string& op, Expression* right, int line = 1, int column = 1)
+        : Expression(line, column), left(left), op(op), right(right) {}
     
     ~BinaryExpression() {
         delete left;
@@ -179,8 +190,8 @@ public:
     Expression* left;
     Expression* right;
     
-    AssignmentExpression(Expression* left, Expression* right)
-        : left(left), right(right) {}
+    AssignmentExpression(Expression* left, Expression* right, int line = 1, int column = 1)
+        : Expression(line, column), left(left), right(right) {}
     
     ~AssignmentExpression() {
         delete left;
@@ -194,7 +205,7 @@ public:
     Expression* expression;
     
     ExpressionStatement(Expression* expression)
-        : expression(expression) {}
+        : Statement(expression->getLine(), expression->getColumn()), expression(expression) {}
     
     ~ExpressionStatement() {
         if (expression) {
@@ -208,8 +219,8 @@ class ReturnStatement : public Statement {
 public:
     Expression* expression;
     
-    ReturnStatement(Expression* expression = nullptr)
-        : expression(expression) {}
+    ReturnStatement(Expression* expression = nullptr, int line = 1, int column = 1)
+        : Statement(line, column), expression(expression) {}
     
     ~ReturnStatement() {
         if (expression) {
@@ -348,6 +359,39 @@ public:
             delete caseStmt;
         }
     }
+};
+
+// Try-Happen statement for error handling
+class TryHappenStatement : public Statement {
+public:
+    std::vector<ASTNode*> tryBody;
+    std::string errorType;
+    std::string errorVariableName;
+    std::vector<ASTNode*> happenBody;
+    
+    TryHappenStatement(const std::vector<ASTNode*>& tryBody, const std::string& errorType, 
+                      const std::string& errorVariableName, const std::vector<ASTNode*>& happenBody)
+        : tryBody(tryBody), errorType(errorType), errorVariableName(errorVariableName), happenBody(happenBody) {}
+    
+    ~TryHappenStatement() {
+        for (auto node : tryBody) {
+            delete node;
+        }
+        for (auto node : happenBody) {
+            delete node;
+        }
+    }
+};
+
+// Error object for representing errors in the language
+class ErrorObject : public Expression {
+public:
+    std::string text;
+    std::string type;
+    std::string info;
+    
+    ErrorObject(const std::string& text, const std::string& type, const std::string& info)
+        : text(text), type(type), info(info) {}
 };
 
 // Namespace declaration node

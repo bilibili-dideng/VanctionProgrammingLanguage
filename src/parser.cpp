@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "error.h"
 #include <iostream>
 #include <cstdlib>
 #include <stdexcept>
@@ -322,9 +323,64 @@ void Parser::consume(TokenType expectedType) {
     if (currentToken.type == expectedType) {
         currentToken = lexer->getNextToken();
     } else {
-        std::string errorMessage = "expected " + tokenTypeToString(expectedType) + ", but got " + tokenTypeToString(currentToken.type) + " at line " + std::to_string(currentToken.line) + " column " + std::to_string(currentToken.column);
-        throw std::runtime_error(errorMessage);
+        std::string errorMessage = "expected " + tokenTypeToString(expectedType) + ", but got " + tokenTypeToString(currentToken.type);
+        throw vanction_error::SyntaxError(errorMessage, currentToken.line, currentToken.column);
     }
+}
+
+// Parse try-happen statement for error handling
+Statement* Parser::parseTryHappenStatement() {
+    // Consume 'try' keyword
+    consume(KEYWORD);
+    
+    // Parse try block
+    auto tryBody = parseBlock();
+    
+    // Expect 'happen' keyword
+    if (currentToken.type != KEYWORD || currentToken.value != "happen") {
+        throw std::runtime_error("Expected 'happen' keyword after try block");
+    }
+    
+    // Consume 'happen' keyword
+    consume(KEYWORD);
+    
+    // Expect left parenthesis
+    consume(LPAREN);
+    
+    // Parse error type
+    std::string errorType;
+    if (currentToken.type == IDENTIFIER) {
+        errorType = currentToken.value;
+        consume(IDENTIFIER);
+    } else {
+        throw std::runtime_error("Expected error type identifier");
+    }
+    
+    // Expect right parenthesis
+    consume(RPAREN);
+    
+    // Expect 'as' keyword
+    if (currentToken.type != KEYWORD || currentToken.value != "as") {
+        throw std::runtime_error("Expected 'as' keyword after error type");
+    }
+    
+    // Consume 'as' keyword
+    consume(KEYWORD);
+    
+    // Parse error variable name
+    std::string errorVariableName;
+    if (currentToken.type == IDENTIFIER) {
+        errorVariableName = currentToken.value;
+        consume(IDENTIFIER);
+    } else {
+        throw std::runtime_error("Expected error variable name");
+    }
+    
+    // Parse happen block
+    auto happenBody = parseBlock();
+    
+    // Create try-happen statement node
+    return new TryHappenStatement(tryBody, errorType, errorVariableName, happenBody);
 }
 
 // Parse function definition
@@ -864,6 +920,11 @@ Statement* Parser::parseStatement() {
         return parseSwitchStatement();
     }
     
+    // Check for try-happen statement
+    if (currentToken.type == KEYWORD && currentToken.value == "try") {
+        return parseTryHappenStatement();
+    }
+    
     // Check for return statement
     if (currentToken.type == KEYWORD && currentToken.value == "return") {
         // Consume 'return' keyword
@@ -888,8 +949,22 @@ Statement* Parser::parseStatement() {
         return nullptr;
     }
     
+    // Save the expression's line and column for error reporting
+    int exprLine = expr->getLine();
+    int exprColumn = expr->getColumn();
+    
     // Expect semicolon
-    consume(SEMICOLON);
+    try {
+        consume(SEMICOLON);
+    } catch (const vanction_error::SyntaxError& e) {
+        // If we got a comment instead of semicolon, use the expression's line and column
+        if (currentToken.type == COMMENT) {
+            std::string errorMessage = "expected semicolon, but got comment";
+            throw vanction_error::SyntaxError(errorMessage, exprLine, exprColumn);
+        }
+        // Re-throw other syntax errors
+        throw;
+    }
     
     // Create expression statement
     return new ExpressionStatement(expr);
@@ -946,12 +1021,53 @@ Expression* Parser::parseExpression() {
 Expression* Parser::parseAssignmentExpression() {
     auto left = parseBinaryExpression();
     
+    // Handle compound assignment operators
     if (currentToken.type == ASSIGN) {
+        int line = left->getLine();
+        int column = left->getColumn();
         consume(ASSIGN);
         auto right = parseAssignmentExpression();
-        
-        // Allow any expression on the left side, not just identifiers
-        return new AssignmentExpression(left, right);
+        return new AssignmentExpression(left, right, line, column);
+    } else if (currentToken.type == PLUS_ASSIGN) {
+        consume(PLUS_ASSIGN);
+        auto right = parseAssignmentExpression();
+        return new BinaryExpression(left, "+", right);
+    } else if (currentToken.type == MINUS_ASSIGN) {
+        consume(MINUS_ASSIGN);
+        auto right = parseAssignmentExpression();
+        return new BinaryExpression(left, "-", right);
+    } else if (currentToken.type == MULTIPLY_ASSIGN) {
+        consume(MULTIPLY_ASSIGN);
+        auto right = parseAssignmentExpression();
+        return new BinaryExpression(left, "*", right);
+    } else if (currentToken.type == DIVIDE_ASSIGN) {
+        consume(DIVIDE_ASSIGN);
+        auto right = parseAssignmentExpression();
+        return new BinaryExpression(left, "/", right);
+    } else if (currentToken.type == MODULO_ASSIGN) {
+        consume(MODULO_ASSIGN);
+        auto right = parseAssignmentExpression();
+        return new BinaryExpression(left, "%", right);
+    } else if (currentToken.type == LSHIFT_ASSIGN) {
+        consume(LSHIFT_ASSIGN);
+        auto right = parseAssignmentExpression();
+        return new BinaryExpression(left, "<<", right);
+    } else if (currentToken.type == RSHIFT_ASSIGN) {
+        consume(RSHIFT_ASSIGN);
+        auto right = parseAssignmentExpression();
+        return new BinaryExpression(left, ">>", right);
+    } else if (currentToken.type == AND_ASSIGN) {
+        consume(AND_ASSIGN);
+        auto right = parseAssignmentExpression();
+        return new BinaryExpression(left, "&", right);
+    } else if (currentToken.type == OR_ASSIGN) {
+        consume(OR_ASSIGN);
+        auto right = parseAssignmentExpression();
+        return new BinaryExpression(left, "|", right);
+    } else if (currentToken.type == XOR_ASSIGN) {
+        consume(XOR_ASSIGN);
+        auto right = parseAssignmentExpression();
+        return new BinaryExpression(left, "^", right);
     }
     
     return left;
@@ -963,13 +1079,23 @@ Expression* Parser::parseMultiplicativeExpression() {
     
     while (true) {
         if (currentToken.type == MULTIPLY) {
-            consume(MULTIPLY);
-            auto right = parsePrimaryExpression();
-            left = new BinaryExpression(left, "*", right);
-        } else if (currentToken.type == DIVIDE) {
-            consume(DIVIDE);
-            auto right = parsePrimaryExpression();
-            left = new BinaryExpression(left, "/", right);
+        int line = currentToken.line;
+        int column = currentToken.column;
+        consume(MULTIPLY);
+        auto right = parsePrimaryExpression();
+        left = new BinaryExpression(left, "*", right, line, column);
+    } else if (currentToken.type == DIVIDE) {
+        int line = currentToken.line;
+        int column = currentToken.column;
+        consume(DIVIDE);
+        auto right = parsePrimaryExpression();
+        left = new BinaryExpression(left, "/", right, line, column);
+    } else if (currentToken.type == MODULO) {
+        int line = currentToken.line;
+        int column = currentToken.column;
+        consume(MODULO);
+        auto right = parsePrimaryExpression();
+        left = new BinaryExpression(left, "%", right, line, column);
         } else {
             break;
         }
@@ -984,13 +1110,17 @@ Expression* Parser::parseAdditiveExpression() {
     
     while (true) {
         if (currentToken.type == PLUS) {
+            int line = currentToken.line;
+            int column = currentToken.column;
             consume(PLUS);
             auto right = parseMultiplicativeExpression();
-            left = new BinaryExpression(left, "+", right);
+            left = new BinaryExpression(left, "+", right, line, column);
         } else if (currentToken.type == MINUS) {
+            int line = currentToken.line;
+            int column = currentToken.column;
             consume(MINUS);
             auto right = parseMultiplicativeExpression();
-            left = new BinaryExpression(left, "-", right);
+            left = new BinaryExpression(left, "-", right, line, column);
         } else {
             break;
         }
@@ -1005,13 +1135,17 @@ Expression* Parser::parseBitShiftExpression() {
     
     while (true) {
         if (currentToken.type == LSHIFT) {
+            int line = currentToken.line;
+            int column = currentToken.column;
             consume(LSHIFT);
             auto right = parseAdditiveExpression();
-            left = new BinaryExpression(left, "<<", right);
+            left = new BinaryExpression(left, "<<", right, line, column);
         } else if (currentToken.type == RSHIFT) {
+            int line = currentToken.line;
+            int column = currentToken.column;
             consume(RSHIFT);
             auto right = parseAdditiveExpression();
-            left = new BinaryExpression(left, ">>", right);
+            left = new BinaryExpression(left, ">>", right, line, column);
         } else {
             break;
         }
@@ -1020,23 +1154,29 @@ Expression* Parser::parseBitShiftExpression() {
     return left;
 }
 
-// Parse logical expressions (AND, OR, XOR)
+// Parse logical expressions (&, |, ^)
 Expression* Parser::parseLogicalExpression() {
     auto left = parseBitShiftExpression();
     
-    while (currentToken.type == KEYWORD) {
-        if (currentToken.value == "AND") {
-            consume(KEYWORD);
+    while (true) {
+        if (currentToken.type == BITWISE_AND) {
+            int line = currentToken.line;
+            int column = currentToken.column;
+            consume(BITWISE_AND);
             auto right = parseBitShiftExpression();
-            left = new BinaryExpression(left, "AND", right);
-        } else if (currentToken.value == "OR") {
-            consume(KEYWORD);
+            left = new BinaryExpression(left, "&", right, line, column);
+        } else if (currentToken.type == BITWISE_OR) {
+            int line = currentToken.line;
+            int column = currentToken.column;
+            consume(BITWISE_OR);
             auto right = parseBitShiftExpression();
-            left = new BinaryExpression(left, "OR", right);
-        } else if (currentToken.value == "XOR") {
-            consume(KEYWORD);
+            left = new BinaryExpression(left, "|", right, line, column);
+        } else if (currentToken.type == XOR) {
+            int line = currentToken.line;
+            int column = currentToken.column;
+            consume(XOR);
             auto right = parseBitShiftExpression();
-            left = new BinaryExpression(left, "XOR", right);
+            left = new BinaryExpression(left, "^", right, line, column);
         } else {
             break;
         }
@@ -1051,29 +1191,41 @@ Expression* Parser::parseComparisonExpression() {
     
     while (true) {
         if (currentToken.type == EQUAL) {
+            int line = currentToken.line;
+            int column = currentToken.column;
             consume(EQUAL);
             auto right = parseLogicalExpression();
-            left = new BinaryExpression(left, "==", right);
+            left = new BinaryExpression(left, "==", right, line, column);
         } else if (currentToken.type == NOT_EQUAL) {
+            int line = currentToken.line;
+            int column = currentToken.column;
             consume(NOT_EQUAL);
             auto right = parseLogicalExpression();
-            left = new BinaryExpression(left, "!=", right);
+            left = new BinaryExpression(left, "!=", right, line, column);
         } else if (currentToken.type == LESS_THAN) {
+            int line = currentToken.line;
+            int column = currentToken.column;
             consume(LESS_THAN);
             auto right = parseLogicalExpression();
-            left = new BinaryExpression(left, "<", right);
+            left = new BinaryExpression(left, "<", right, line, column);
         } else if (currentToken.type == LESS_EQUAL) {
+            int line = currentToken.line;
+            int column = currentToken.column;
             consume(LESS_EQUAL);
             auto right = parseLogicalExpression();
-            left = new BinaryExpression(left, "<=", right);
+            left = new BinaryExpression(left, "<=", right, line, column);
         } else if (currentToken.type == GREATER_THAN) {
+            int line = currentToken.line;
+            int column = currentToken.column;
             consume(GREATER_THAN);
             auto right = parseLogicalExpression();
-            left = new BinaryExpression(left, ">", right);
+            left = new BinaryExpression(left, ">", right, line, column);
         } else if (currentToken.type == GREATER_EQUAL) {
+            int line = currentToken.line;
+            int column = currentToken.column;
             consume(GREATER_EQUAL);
             auto right = parseLogicalExpression();
-            left = new BinaryExpression(left, ">=", right);
+            left = new BinaryExpression(left, ">=", right, line, column);
         } else {
             break;
         }
@@ -1092,7 +1244,7 @@ Expression* Parser::parsePrimaryExpression() {
     // Check for class method call (e.g., class.method())
     if (currentToken.type == KEYWORD && currentToken.value == "class") {
         // Create an Identifier object for "class"
-        auto ident = new Identifier("class");
+        auto ident = new Identifier("class", currentToken.line, currentToken.column);
         
         // Consume the "class" keyword
         currentToken = lexer->getNextToken();
@@ -1104,6 +1256,8 @@ Expression* Parser::parsePrimaryExpression() {
             
             // Parse method name
             std::string methodName = currentToken.value;
+            int methodLine = currentToken.line;
+            int methodColumn = currentToken.column;
             currentToken = lexer->getNextToken();
             
             // It should be a method call
@@ -1115,7 +1269,7 @@ Expression* Parser::parsePrimaryExpression() {
             consume(LPAREN);
             
             // Create function call node
-            auto call = new FunctionCall("class", methodName);
+            auto call = new FunctionCall("class", methodName, methodLine, methodColumn);
             
             // Parse arguments
             if (currentToken.type != RPAREN) {
@@ -1288,6 +1442,8 @@ Expression* Parser::parsePrimaryExpression() {
     // Check for identifier or instance keyword
     if (currentToken.type == IDENTIFIER || (currentToken.type == KEYWORD && currentToken.value == "instance")) {
         std::string name = currentToken.value;
+        int line = currentToken.line;
+        int column = currentToken.column;
         currentToken = lexer->getNextToken();
         
         // Check if it's a namespace access (e.g., namespace:member)
@@ -1305,7 +1461,7 @@ Expression* Parser::parsePrimaryExpression() {
                 consume(LPAREN);
                 
                 // Create function call node
-                auto call = new FunctionCall(name, memberName);
+            auto call = new FunctionCall(name, memberName, line, column);
                 
                 // Parse arguments
                 if (currentToken.type != RPAREN) {
@@ -1417,7 +1573,7 @@ Expression* Parser::parsePrimaryExpression() {
         } 
         else {
             // It's a simple identifier
-            return new Identifier(name);
+            return new Identifier(name, line, column);
         }
     }
     
@@ -1464,13 +1620,46 @@ Expression* Parser::parsePrimaryExpression() {
 
 // Parse string literal
 Expression* Parser::parseStringLiteral() {
-    std::string value = currentToken.value;
-    // Remove quotes
-    if (value.size() >= 2) {
-        value = value.substr(1, value.size() - 2);
+    std::string tokenValue = currentToken.value;
+    std::string type = "normal";
+    std::string value;
+    
+    // Check for prefix and remove it along with quotes
+    if (tokenValue.size() >= 3 && (tokenValue[0] == 'r' || tokenValue[0] == 'f') && tokenValue[1] == '"') {
+        // Has prefix
+        type = (tokenValue[0] == 'r') ? "raw" : "format";
+        // Remove prefix and quotes
+        value = tokenValue.substr(2, tokenValue.size() - 3);
+    } else if (tokenValue.size() >= 2) {
+        // Normal string without prefix
+        value = tokenValue.substr(1, tokenValue.size() - 2);
     }
+    
+    // Process escape sequences for non-raw strings
+    if (type != "raw") {
+        std::string processedValue;
+        for (size_t i = 0; i < value.size(); ++i) {
+            if (value[i] == '\\' && i + 1 < value.size()) {
+                // Handle escape sequences
+                char nextChar = value[i + 1];
+                switch (nextChar) {
+                    case 'n': processedValue += '\n'; break;
+                    case 't': processedValue += '\t'; break;
+                    case 'r': processedValue += '\r'; break;
+                    case '"': processedValue += '"'; break;
+                    case '\\': processedValue += '\\'; break;
+                    default: processedValue += nextChar; break;
+                }
+                i++; // Skip the next character
+            } else {
+                processedValue += value[i];
+            }
+        }
+        value = processedValue;
+    }
+    
     currentToken = lexer->getNextToken();
-    return new StringLiteral(value);
+    return new StringLiteral(value, type);
 }
 
 // Parse integer literal

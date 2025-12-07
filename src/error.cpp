@@ -66,12 +66,12 @@ void ErrorReporter::report(const Error& error) {
     // Print error header in blue
     std::cout << blue("error occurred to:") << std::endl;
     
-    // Print file path in purple
-    std::cout << "    " << purple(filePath) << std::endl;
+    // Print file path with line and column in purple
+    std::cout << "    " << purple(filePath + ":" + std::to_string(error.getLine()) + ":" + std::to_string(error.getColumn())) << std::endl;
     
     // Print error context in purple
     for (size_t i = 0; i < context.size(); ++i) {
-        int actualLine = error.getLine() - 1 + i;
+        int actualLine = error.getLine() - 2 + i;
         std::cout << "    " << purple(context[i]) << std::endl;
         
         // Print error indicator (^^^^^^^) in red if this is the error line
@@ -99,13 +99,21 @@ std::vector<std::string> ErrorReporter::getErrorContext(int errorLine) {
     
     std::vector<std::string> context;
     
-    // Calculate start and end line indices for context
-    int startLine = std::max(0, errorLine - 2);
-    int endLine = std::min(static_cast<int>(lines.size()), errorLine + 1);
+    // Adjust errorLine to be zero-based
+    int zeroBasedErrorLine = errorLine - 1;
+    
+    // Calculate start and end line indices for context (three lines total)
+    int startLine = std::max(0, zeroBasedErrorLine - 1);
+    int endLine = std::min(static_cast<int>(lines.size()), zeroBasedErrorLine + 2);
     
     // Add context lines
     for (int i = startLine; i < endLine; ++i) {
         context.push_back(lines[i]);
+    }
+    
+    // If we don't have enough lines, pad with empty strings to ensure we always show three lines
+    while (context.size() < 3) {
+        context.insert(context.begin(), "");
     }
     
     return context;

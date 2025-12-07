@@ -108,6 +108,7 @@ Vanction 是一种简单的编译型编程语言，支持编译为可执行文�
   - `generateDoWhileLoopStatement()`：生成 do-while 循环的 C++ 代码
   - `generateSwitchStatement()`：生成 switch 语句的 C++ 代码
   - `generateReturnStatement()`：生成 return 语句的 C++ 代码
+  - `generateTryHappenStatement()`：生成 try-happen 语句的 C++ 代码
 
 ### 3.5 解释器
 
@@ -116,9 +117,10 @@ Vanction 是一种简单的编译型编程语言，支持编译为可执行文�
 - **关键函数**：
   - `executeProgram()`：执行整个程序
   - `executeFunctionDeclaration()`：执行函数声明
-  - `executeStatement()`：执行语句，包括return语句
+  - `executeStatement()`：执行语句，包括 return 语句和 try-happen 语句
   - `executeExpression()`：执行表达式，支持多种运算符和数据类型
   - `executeFunctionCall()`：执行函数调用，包括类型转换函数
+  - `executeTryHappenStatement()`：执行 try-happen 错误处理语句
   
 - **支持的数据类型**：
   - int
@@ -128,13 +130,43 @@ Vanction 是一种简单的编译型编程语言，支持编译为可执行文�
   - string
   - bool
   - undefined
+  - Instance*
+  - ErrorObject*
   
 - **支持的运算符**：
-  - 算术运算符：+、-、*、/
-  - 位运算符：<<、>>
+  - 算术运算符：+、-、*、/、%
+  - 位运算符：<<、>>、&、|、^
   - 比较运算符：==、!=、<、<=、>、>=
-  - 逻辑运算符：AND、OR、XOR
-  - 赋值运算符：=
+  - 逻辑运算符：&、|、^
+  - 赋值运算符：=、+=、-=、*=、/=、%=、<<=、>>=、&=、|=、^=
+  - 自增/自减运算符：++、--
+
+### 3.6 错误处理系统
+
+- **功能**：提供完善的错误处理机制，包括编译时错误检查和运行时错误处理
+- **实现**：`src/error.cpp` 和 `src/error.h`
+- **主要组件**：
+  - `ErrorType`：错误类型枚举
+  - `vanction_error`：错误命名空间，包含所有具体的错误类
+  - `Error`：表示错误的类，包含错误类型、消息、文件路径、行号和列号
+  - `ErrorReporter`：错误报告器，用于格式化和输出错误信息
+  - `ErrorObject`：运行时错误对象，包含完整的错误信息
+
+- **支持的错误类型**：
+  - `CError`：C++ 错误
+  - `MethodError`：方法调用错误
+  - `CompilationError`：编译错误
+  - `DivideByZeroError`：除零错误
+  - `ValueError`：类型转换错误
+  - `TokenError`：未知标记错误
+  - `SyntaxError`：语法错误
+  - `MainFunctionError`：缺少主函数
+  - `UnknownError`：未知错误
+
+- **try-happen 错误处理**：
+  - 支持运行时错误捕获和处理
+  - 错误对象包含 text、type 和 info 属性
+  - 支持特定错误类型捕获和通用错误捕获
 
 ## 4. 编译和构建流程
 
@@ -248,3 +280,12 @@ cmake --build .
   - 支持`init`构造函数方法
   - 支持`class.method()`语法用于类方法调用
   - 支持`instance.method()`语法用于实例方法调用
+- **try-happen 错误处理机制**：
+  - 实现了try-happen语法结构，用于运行时错误捕获和处理
+  - 创建了vanction_error命名空间，包含所有具体的错误类
+  - 支持显式错误类型指定方式
+  - 错误对象包含text、type和info属性
+  - 支持特定错误类型捕获和通用错误捕获
+  - 优化了错误显示格式，添加了行号和列号
+  - 修复了错误上下文显示bug
+  - 重构了错误类型判断机制

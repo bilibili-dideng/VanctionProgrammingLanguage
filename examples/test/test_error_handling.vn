@@ -1,0 +1,54 @@
+func main() {
+    System.print("Testing try-happen error handling...");
+    
+    || Test 1: Division by zero error
+    try {
+        System.print("Test 1: Division by zero");
+        auto result = 10 / 0;
+        System.print("Result: " + result);
+    } happen (DivideByZeroError) as e {
+        System.print("Caught DivideByZeroError:");
+        System.print("  Error text: " + e.text);
+        System.print("  Error type: " + e.type);
+        System.print("  Error info: " + e.info);
+    }
+    
+    || Test 2: Value error
+    try {
+        System.print("\nTest 2: Value error");
+        auto result = type.int("abc");
+        System.print("Result: " + result);
+    } happen (ValueError) as e {
+        System.print("Caught ValueError:");
+        System.print("  Error text: " + e.text);
+        System.print("  Error type: " + e.type);
+        System.print("  Error info: " + e.info);
+    }
+    
+    || Test 3: Method error
+    try {
+        System.print("\nTest 3: Method error");
+        auto obj = instance Person("Test");
+        obj.nonExistentMethod();
+    } happen (MethodError) as e {
+        System.print("Caught MethodError:");
+        System.print("  Error text: " + e.text);
+        System.print("  Error type: " + e.type);
+        System.print("  Error info: " + e.info);
+    }
+    
+    || Test 4: Generic Error type (should catch all errors)
+    try {
+        System.print("\nTest 4: Generic Error type");
+        auto result = 10 / 0;
+        System.print("Result: " + result);
+    } happen (Error) as e {
+        System.print("Caught generic Error:");
+        System.print("  Error text: " + e.text);
+        System.print("  Error type: " + e.type);
+        System.print("  Error info: " + e.info);
+    }
+    
+    System.print("\nAll tests completed!");
+    return 0;
+}

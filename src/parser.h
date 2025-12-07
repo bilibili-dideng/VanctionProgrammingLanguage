@@ -123,6 +123,9 @@ private:
     
     // Parse switch statement
     Statement* parseSwitchStatement();
+    
+    // Parse try-happen statement for error handling
+    Statement* parseTryHappenStatement();
 };
 
 #endif // VANCTION_PARSER_H
