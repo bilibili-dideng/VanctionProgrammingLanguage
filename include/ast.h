@@ -562,6 +562,19 @@ public:
     }
 };
 
+// Import statement node
+class ImportStatement : public ASTNode {
+public:
+    std::string moduleName;
+    std::vector<std::string> members;
+    std::string alias;
+    
+    ImportStatement(const std::string& moduleName, int line = 1, int column = 1)
+        : ASTNode(line, column), moduleName(moduleName) {}
+    
+    ~ImportStatement() {}
+};
+
 // Program node
 class Program : public ASTNode {
 public:

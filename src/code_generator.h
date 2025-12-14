@@ -106,6 +106,9 @@ private:
     
     // Generate range expression
     std::string generateRangeExpression(RangeExpression* range);
+    
+    // Generate import statement
+    std::string generateImportStatement(ImportStatement* importStmt);
 };
 
 #endif // VANCTION_CODE_GENERATOR_H

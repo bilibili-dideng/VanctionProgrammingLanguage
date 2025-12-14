@@ -13,6 +13,7 @@ set(SOURCE_FILES
     src/main.cpp
     src/code_generator.cpp
     src/error.cpp
+    src/module_manager.cpp
 )
 
 # 添加可执行文件

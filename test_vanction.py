@@ -21,8 +21,12 @@ if not os.path.exists(TEST_DIR):
     print(f"Error: Test directory not found at {TEST_DIR}")
     sys.exit(1)
 
+# 要忽略的测试文件列表
+ignore_files = ["import_test_a.vn"]
+
 # 获取所有测试文件
-test_files = glob.glob(os.path.join(TEST_DIR, "*.vn"))
+test_files = [f for f in glob.glob(os.path.join(TEST_DIR, "*.vn")) 
+              if os.path.basename(f) not in ignore_files]
 
 if not test_files:
     print(f"Warning: No .vn files found in {TEST_DIR}")
@@ -80,7 +84,17 @@ for test_file in test_files:
         print(f"  ✗ FAIL - Exception: {e}")
         fail_count += 1
     
+    
     print()
+
+# 清理生成的.exe文件
+for test_file in test_files:
+    exe_file = test_file.replace(".vn", ".exe")
+    if os.path.exists(exe_file):
+        try:
+            os.remove(exe_file)
+        except Exception as e:
+            print(f"Warning: Failed to remove {exe_file}: {e}")
 
 print("=" * 60)
 print(f"Test Results:")

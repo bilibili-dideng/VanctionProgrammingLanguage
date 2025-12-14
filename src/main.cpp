@@ -1,6 +1,7 @@
 #include "parser.h"
 #include "code_generator.h"
 #include "error.h"
+#include "module_manager.h"
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -240,15 +241,48 @@ void executeNamespaceDeclaration(NamespaceDeclaration* ns) {
     }
 }
 
+// Forward declaration for executeProgram function
+Value executeProgram(Program* program, const std::string& namespaceName = "");
+
+// Global module manager to avoid dangling pointer issues
+ModuleManager* globalModuleManager = nullptr;
+
+// Execute import statement
+void executeImportStatement(ImportStatement* importStmt) {
+    std::string moduleName = importStmt->moduleName;
+    
+    // Initialize global module manager if it doesn't exist
+    if (!globalModuleManager) {
+        globalModuleManager = new ModuleManager();
+    }
+    
+    // Load the module
+    Module* module = globalModuleManager->loadModule(moduleName);
+    if (!module) {
+        throw vanction_error::MethodError("Cannot load module: " + moduleName);
+    }
+    
+    // Execute the imported module with the specified alias as namespace
+    executeProgram(module->ast, importStmt->alias);
+}
+
 // Execute program
-Value executeProgram(Program* program) {
+Value executeProgram(Program* program, const std::string& namespaceName) {
     // Execute all declarations
     for (auto decl : program->declarations) {
         if (auto func = dynamic_cast<FunctionDeclaration*>(decl)) {
-            Value result = executeFunctionDeclaration(func);
-            // If this is the main function, return its result
-            if (func->name == "main") {
-                return result;
+            if (!namespaceName.empty()) {
+                // If we're in a namespace, add the function to the namespace
+                if (namespaces.find(namespaceName) == namespaces.end()) {
+                    namespaces[namespaceName] = std::map<std::string, FunctionDeclaration*>();
+                }
+                namespaces[namespaceName][func->name] = func;
+            } else {
+                Value result = executeFunctionDeclaration(func);
+                // If this is the main function, return its result
+                if (func->name == "main") {
+                    return result;
+                }
             }
         } else if (auto ns = dynamic_cast<NamespaceDeclaration*>(decl)) {
             // Execute namespace declaration
@@ -256,6 +290,9 @@ Value executeProgram(Program* program) {
         } else if (auto cls = dynamic_cast<ClassDeclaration*>(decl)) {
             // Execute class declaration
             executeClassDeclaration(cls);
+        } else if (auto importStmt = dynamic_cast<ImportStatement*>(decl)) {
+            // Execute import statement
+            executeImportStatement(importStmt);
         }
     }
     return std::monostate{};
@@ -419,6 +456,221 @@ Value executeStatement(ASTNode* stmt, bool* shouldReturn) {
                 throw;
             }
         }
+        return std::monostate{};
+    } else if (auto forLoopStmt = dynamic_cast<ForLoopStatement*>(stmt)) {
+        // Execute traditional for loop
+        // Execute initialization
+        executeStatement(forLoopStmt->initialization);
+        
+        // Execute loop while condition is true
+        while (true) {
+            // Evaluate condition
+            Value conditionValue = executeExpression(forLoopStmt->condition);
+            bool condition = false;
+            if (std::holds_alternative<bool>(conditionValue)) {
+                condition = std::get<bool>(conditionValue);
+            } else if (std::holds_alternative<int>(conditionValue)) {
+                condition = (std::get<int>(conditionValue) != 0);
+            } else if (std::holds_alternative<float>(conditionValue)) {
+                condition = (std::get<float>(conditionValue) != 0.0f);
+            } else if (std::holds_alternative<double>(conditionValue)) {
+                condition = (std::get<double>(conditionValue) != 0.0);
+            }
+            
+            if (!condition) {
+                break;
+            }
+            
+            // Execute loop body
+            for (auto bodyStmt : forLoopStmt->body) {
+                bool bodyShouldReturn = false;
+                Value bodyResult = executeStatement(bodyStmt, &bodyShouldReturn);
+                if (bodyShouldReturn) {
+                    return bodyResult;
+                }
+            }
+            
+            // Execute increment
+            executeExpression(forLoopStmt->increment);
+        }
+        return std::monostate{};
+    } else if (auto forInStmt = dynamic_cast<ForInLoopStatement*>(stmt)) {
+        // Execute for-in loop
+        
+        // Handle ListLiteral
+        if (auto listLit = dynamic_cast<ListLiteral*>(forInStmt->collection)) {
+            // Iterate over list elements
+            for (auto elementExpr : listLit->elements) {
+                // Execute element expression and get value
+                Value elementValue = executeExpression(elementExpr);
+                
+                // Store current element in loop variable
+                variables[forInStmt->keyVariableName] = elementValue;
+                
+                // Execute loop body
+                for (auto bodyStmt : forInStmt->body) {
+                    bool bodyShouldReturn = false;
+                    Value bodyResult = executeStatement(bodyStmt, &bodyShouldReturn);
+                    if (bodyShouldReturn) {
+                        return bodyResult;
+                    }
+                }
+            }
+        }
+        // Handle HashMapLiteral
+        else if (auto hashMapLit = dynamic_cast<HashMapLiteral*>(forInStmt->collection)) {
+            // Iterate over hash map entries
+            for (auto entry : hashMapLit->entries) {
+                // Execute key and value expressions
+                Value keyValue = executeExpression(entry->key);
+                Value valueValue = executeExpression(entry->value);
+                
+                // Store current key and value in loop variables
+                variables[forInStmt->keyVariableName] = keyValue;
+                variables[forInStmt->valueVariableName] = valueValue;
+                
+                // Execute loop body
+                for (auto bodyStmt : forInStmt->body) {
+                    bool bodyShouldReturn = false;
+                    Value bodyResult = executeStatement(bodyStmt, &bodyShouldReturn);
+                    if (bodyShouldReturn) {
+                        return bodyResult;
+                    }
+                }
+            }
+        }
+        // Handle RangeExpression
+        else if (auto rangeExpr = dynamic_cast<RangeExpression*>(forInStmt->collection)) {
+            // Execute range start, end, and step expressions
+            Value startValue = executeExpression(rangeExpr->start);
+            Value endValue = executeExpression(rangeExpr->end);
+            Value stepValue = (rangeExpr->step) ? executeExpression(rangeExpr->step) : Value{1};
+            
+            // Convert to integers
+            int start = (std::holds_alternative<int>(startValue)) ? std::get<int>(startValue) : 0;
+            int end = (std::holds_alternative<int>(endValue)) ? std::get<int>(endValue) : 0;
+            int step = (std::holds_alternative<int>(stepValue)) ? std::get<int>(stepValue) : 1;
+            
+            // Iterate over range
+            for (int i = start; i < end; i += step) {
+                // Store current index in loop variable
+                variables[forInStmt->keyVariableName] = i;
+                
+                // Execute loop body
+                for (auto bodyStmt : forInStmt->body) {
+                    bool bodyShouldReturn = false;
+                    Value bodyResult = executeStatement(bodyStmt, &bodyShouldReturn);
+                    if (bodyShouldReturn) {
+                        return bodyResult;
+                    }
+                }
+            }
+        }
+        // Handle function call that returns range (e.g., range(10))
+        else if (auto funcCall = dynamic_cast<FunctionCall*>(forInStmt->collection)) {
+            if (funcCall->methodName == "range" && funcCall->objectName.empty()) {
+                // Parse range function arguments
+                int start = 0;
+                int end = 0;
+                int step = 1;
+                
+                if (funcCall->arguments.size() == 1) {
+                    // range(end)
+                    Value endValue = executeExpression(funcCall->arguments[0]);
+                    end = (std::holds_alternative<int>(endValue)) ? std::get<int>(endValue) : 0;
+                } else if (funcCall->arguments.size() >= 2) {
+                    // range(start, end, step?)
+                    Value startValue = executeExpression(funcCall->arguments[0]);
+                    Value endValue = executeExpression(funcCall->arguments[1]);
+                    start = (std::holds_alternative<int>(startValue)) ? std::get<int>(startValue) : 0;
+                    end = (std::holds_alternative<int>(endValue)) ? std::get<int>(endValue) : 0;
+                    
+                    if (funcCall->arguments.size() >= 3) {
+                        Value stepValue = executeExpression(funcCall->arguments[2]);
+                        step = (std::holds_alternative<int>(stepValue)) ? std::get<int>(stepValue) : 1;
+                    }
+                }
+                
+                // Iterate over range
+                for (int i = start; i < end; i += step) {
+                    // Store current index in loop variable
+                    variables[forInStmt->keyVariableName] = i;
+                    
+                    // Execute loop body
+                    for (auto bodyStmt : forInStmt->body) {
+                        bool bodyShouldReturn = false;
+                        Value bodyResult = executeStatement(bodyStmt, &bodyShouldReturn);
+                        if (bodyShouldReturn) {
+                            return bodyResult;
+                        }
+                    }
+                }
+            }
+        }
+        return std::monostate{};
+    } else if (auto whileStmt = dynamic_cast<WhileLoopStatement*>(stmt)) {
+        // Execute while loop
+        while (true) {
+            // Evaluate condition
+            Value conditionValue = executeExpression(whileStmt->condition);
+            bool condition = false;
+            if (std::holds_alternative<bool>(conditionValue)) {
+                condition = std::get<bool>(conditionValue);
+            } else if (std::holds_alternative<int>(conditionValue)) {
+                condition = (std::get<int>(conditionValue) != 0);
+            } else if (std::holds_alternative<float>(conditionValue)) {
+                condition = (std::get<float>(conditionValue) != 0.0f);
+            } else if (std::holds_alternative<double>(conditionValue)) {
+                condition = (std::get<double>(conditionValue) != 0.0);
+            } else if (std::holds_alternative<std::string>(conditionValue)) {
+                condition = !std::get<std::string>(conditionValue).empty();
+            }
+            
+            if (!condition) {
+                break;
+            }
+            
+            // Execute loop body
+            for (auto bodyStmt : whileStmt->body) {
+                bool bodyShouldReturn = false;
+                Value bodyResult = executeStatement(bodyStmt, &bodyShouldReturn);
+                if (bodyShouldReturn) {
+                    return bodyResult;
+                }
+            }
+        }
+        return std::monostate{};
+    } else if (auto doWhileStmt = dynamic_cast<DoWhileLoopStatement*>(stmt)) {
+        // Execute do-while loop
+        do {
+            // Execute loop body
+            for (auto bodyStmt : doWhileStmt->body) {
+                bool bodyShouldReturn = false;
+                Value bodyResult = executeStatement(bodyStmt, &bodyShouldReturn);
+                if (bodyShouldReturn) {
+                    return bodyResult;
+                }
+            }
+            
+            // Evaluate condition
+            Value conditionValue = executeExpression(doWhileStmt->condition);
+            bool condition = false;
+            if (std::holds_alternative<bool>(conditionValue)) {
+                condition = std::get<bool>(conditionValue);
+            } else if (std::holds_alternative<int>(conditionValue)) {
+                condition = (std::get<int>(conditionValue) != 0);
+            } else if (std::holds_alternative<float>(conditionValue)) {
+                condition = (std::get<float>(conditionValue) != 0.0f);
+            } else if (std::holds_alternative<double>(conditionValue)) {
+                condition = (std::get<double>(conditionValue) != 0.0);
+            } else if (std::holds_alternative<std::string>(conditionValue)) {
+                condition = !std::get<std::string>(conditionValue).empty();
+            }
+            
+            if (!condition) {
+                break;
+            }
+        } while (true);
         return std::monostate{};
     } else if (auto funcDecl = dynamic_cast<FunctionDeclaration*>(stmt)) {
         // Execute nested function declaration
@@ -1796,6 +2048,23 @@ int main(int argc, char* argv[]) {
                 delete program;
                 return 1;
             }
+            
+            // Extract the directory of the currently executing file
+            std::string fileDirectory;
+            size_t lastSlash = filePath.find_last_of("/\\");
+            if (lastSlash != std::string::npos) {
+                fileDirectory = filePath.substr(0, lastSlash);
+            } else {
+                fileDirectory = ".";
+            }
+            
+            // Initialize global module manager before executing program
+            if (!globalModuleManager) {
+                globalModuleManager = new ModuleManager();
+            }
+            
+            // Set the directory of the currently executing file
+            globalModuleManager->setCurrentExecutingFileDirectory(fileDirectory);
             
             // Execute the program
             Value result = executeProgram(program);

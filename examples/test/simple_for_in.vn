@@ -1,0 +1,7 @@
+func main() {
+    List list = [1, 2, 3, 4, 5];
+    System.print("List elements:");
+    for (i in list) {
+        System.print(i);
+    }
+}

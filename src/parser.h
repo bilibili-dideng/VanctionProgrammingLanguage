@@ -126,6 +126,9 @@ private:
     
     // Parse try-happen statement for error handling
     Statement* parseTryHappenStatement();
+    
+    // Parse import statement
+    ImportStatement* parseImportStatementAST();
 };
 
 #endif // VANCTION_PARSER_H

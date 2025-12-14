@@ -16,10 +16,8 @@ bool Parser::parseProgram() {
     while (currentToken.type != EOF_TOKEN) {
         if (currentToken.type == KEYWORD && currentToken.value == "func") {
             if (parseFunction()) {
-                // Check if it's main function
-                if (functionName == "main") {
-                    return true;
-                }
+                // No more main function check, always return true after parsing a function
+                return true;
             }
         } else if (currentToken.type == KEYWORD && currentToken.value == "namespace") {
             // Skip namespace declaration
@@ -61,13 +59,36 @@ bool Parser::parseProgram() {
                 }
                 currentToken = lexer->getNextToken();
             }
+        } else if (currentToken.type == KEYWORD && currentToken.value == "import") {
+            // Skip import statement
+            consume(KEYWORD);
+            consume(IDENTIFIER);
+            
+            // Skip using clause if exists
+            if (currentToken.type == KEYWORD && currentToken.value == "using") {
+                consume(KEYWORD);
+                consume(IDENTIFIER);
+                
+                // Skip additional members
+                while (currentToken.type == COMMA) {
+                    consume(COMMA);
+                    consume(IDENTIFIER);
+                }
+            }
+            
+            // Skip to clause if exists
+            if (currentToken.type == KEYWORD && currentToken.value == "to") {
+                consume(KEYWORD);
+                consume(IDENTIFIER);
+            }
         } else {
             // If it's not a function, namespace, or class declaration, skip this token and continue
             currentToken = lexer->getNextToken();
         }
     }
     
-    return false;
+    // No more main function check, return true even if no main function is found
+    return true;
 }
 
 // Parse namespace declaration and generate AST
@@ -288,6 +309,51 @@ ClassDeclaration* Parser::parseClassDeclarationAST() {
     return cls;
 }
 
+// Parse import statement
+ImportStatement* Parser::parseImportStatementAST() {
+    // Consume 'import' keyword
+    consume(KEYWORD);
+    
+    // Parse module name
+    std::string moduleName = currentToken.value;
+    int line = currentToken.line;
+    int column = currentToken.column;
+    consume(IDENTIFIER);
+    
+    // Create import statement node
+    auto importStmt = new ImportStatement(moduleName, line, column);
+    
+    // Check if there's 'using' clause for selective import
+    if (currentToken.type == KEYWORD && currentToken.value == "using") {
+        consume(KEYWORD);
+        
+        // Parse member name
+        std::string memberName = currentToken.value;
+        consume(IDENTIFIER);
+        importStmt->members.push_back(memberName);
+        
+        // Allow multiple members separated by commas
+        while (currentToken.type == COMMA) {
+            consume(COMMA);
+            memberName = currentToken.value;
+            consume(IDENTIFIER);
+            importStmt->members.push_back(memberName);
+        }
+    }
+    
+    // Check if there's 'to' clause for alias
+    if (currentToken.type == KEYWORD && currentToken.value == "to") {
+        consume(KEYWORD);
+        
+        // Parse alias name
+        std::string alias = currentToken.value;
+        consume(IDENTIFIER);
+        importStmt->alias = alias;
+    }
+    
+    return importStmt;
+}
+
 // Parse program and generate AST
 Program* Parser::parseProgramAST() {
     auto program = new Program();
@@ -308,6 +374,11 @@ Program* Parser::parseProgramAST() {
             auto cls = parseClassDeclarationAST();
             if (cls) {
                 program->declarations.push_back(cls);
+            }
+        } else if (currentToken.type == KEYWORD && currentToken.value == "import") {
+            auto importStmt = parseImportStatementAST();
+            if (importStmt) {
+                program->declarations.push_back(importStmt);
             }
         } else {
             // If it's not a function, namespace, or class declaration, skip this token and continue
@@ -1749,36 +1820,76 @@ Expression* Parser::parsePrimaryExpression() {
         }
         // Check if it's a regular function call (e.g., myFunction())
         else if (currentToken.type == LPAREN) {
-            // It's a regular function call
-            consume(LPAREN);
-            
-            // Create function call node (use empty object name for regular function calls)
-            auto call = new FunctionCall("", name);
-            
-            // Parse arguments
-            if (currentToken.type != RPAREN) {
+            // Special case for range() function
+            if (name == "range") {
+                consume(LPAREN);
+                
+                // Parse arguments for range()
+                Expression* start = nullptr;
+                Expression* end = nullptr;
+                Expression* step = nullptr;
+                
+                // Parse first argument
                 auto arg = parseExpression();
                 if (arg) {
-                    call->arguments.push_back(arg);
+                    // Check if there's a comma after first argument
+                    if (currentToken.type == COMMA) {
+                        // Two or three arguments: range(start, end, step?)
+                        start = arg;
+                        consume(COMMA);
+                        
+                        // Parse second argument
+                        end = parseExpression();
+                        if (end) {
+                            // Check if there's a third argument
+                            if (currentToken.type == COMMA) {
+                                consume(COMMA);
+                                step = parseExpression();
+                            }
+                        }
+                    } else {
+                        // Single argument: range(end)
+                        start = new IntegerLiteral(0, currentToken.line, currentToken.column);
+                        end = arg;
+                    }
                 }
                 
-                // Parse additional arguments separated by commas
-                while (currentToken.type == COMMA) {
-                    // Consume comma
-                    consume(COMMA);
-                    
-                    // Parse next argument
-                    arg = parseExpression();
+                // Expect right parenthesis
+                consume(RPAREN);
+                
+                return new RangeExpression(start, end, step, line, column);
+            } else {
+                // It's a regular function call
+                consume(LPAREN);
+                
+                // Create function call node (use empty object name for regular function calls)
+                auto call = new FunctionCall("", name);
+                
+                // Parse arguments
+                if (currentToken.type != RPAREN) {
+                    auto arg = parseExpression();
                     if (arg) {
                         call->arguments.push_back(arg);
                     }
+                    
+                    // Parse additional arguments separated by commas
+                    while (currentToken.type == COMMA) {
+                        // Consume comma
+                        consume(COMMA);
+                        
+                        // Parse next argument
+                        arg = parseExpression();
+                        if (arg) {
+                            call->arguments.push_back(arg);
+                        }
+                    }
                 }
+                
+                // Expect right parenthesis
+                consume(RPAREN);
+                
+                return call;
             }
-            
-            // Expect right parenthesis
-            consume(RPAREN);
-            
-            return call;
         } 
         else {
             // It's a simple identifier

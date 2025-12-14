@@ -1,0 +1,8 @@
+import import_test_a to math
+
+func main() {
+    System.print(math.add(1, 2));
+    System.print(math.subtract(5, 3));
+    System.print(math.multiply(4, 2));
+    return 0;
+}

@@ -539,6 +539,8 @@ Token Lexer::parseIdentifierOrKeyword() {
         value == "switch" || value == "case" || value == "in" || value == "return" || value == "namespace" ||
         // Error handling keywords
         value == "try" || value == "happen" || value == "as" ||
+        // Import keywords
+        value == "import" || value == "using" || value == "to" ||
         // OOP keywords
         value == "class" || value == "instance" || value == "init") {
         token.type = KEYWORD;

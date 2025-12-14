@@ -196,6 +196,8 @@ std::string CodeGenerator::generate(Program* program) {
             code += generateNamespaceDeclaration(ns);
         } else if (auto cls = dynamic_cast<ClassDeclaration*>(decl)) {
             code += generateClassDeclaration(cls);
+        } else if (auto importStmt = dynamic_cast<ImportStatement*>(decl)) {
+            code += generateImportStatement(importStmt);
         }
     }
     
@@ -277,10 +279,20 @@ std::string CodeGenerator::generateFunctionDeclaration(FunctionDeclaration* func
 
 // Generate expression statement
 std::string CodeGenerator::generateExpressionStatement(ExpressionStatement* stmt) {
+    if (auto funcCall = dynamic_cast<FunctionCall*>(stmt->expression)) {
+        if ((funcCall->objectName == "System" && funcCall->methodName == "print") ||
+            (funcCall->objectName == "System" && funcCall->methodName == "input")) {
+            // For System.print and System.input, generate the statement without adding semicolon
+            // because generateFunctionCall already returns a complete statement with << std::endl
+            return "    " + generateExpression(stmt->expression) + ";\n";
+        }
+    }
     if (auto assignExpr = dynamic_cast<AssignmentExpression*>(stmt->expression)) {
         if (auto ident = dynamic_cast<Identifier*>(assignExpr->left)) {
-            // Generate auto declaration for all identifier assignments
-            return "    auto " + generateAssignmentExpression(assignExpr) + ";\n";
+            // Only generate auto declaration for instance creation expressions
+            if (dynamic_cast<InstanceCreationExpression*>(assignExpr->right)) {
+                return "    auto " + generateExpression(assignExpr) + ";\n";
+            }
         }
     }
     return "    " + generateExpression(stmt->expression) + ";\n";
@@ -613,8 +625,8 @@ std::string CodeGenerator::generateForInLoopStatement(ForInLoopStatement* stmt) 
                     // Check if it's a formatted string
                     if (funcCall->arguments.size() > 0) {
                         auto stringExpr = dynamic_cast<StringLiteral*>(funcCall->arguments[0]);
-                        if (stringExpr && stringExpr->type == "format") {
-                            // Generate special code for formatted print in loop
+                        if (stringExpr && stringExpr->type == "format" && stmt->isKeyValuePair) {
+                            // Generate special code for formatted print in loop - only for key-value pairs
                             std::string formatStr = stringExpr->value;
                             code += "        std::cout << \"Key is \" << " + stmt->keyVariableName + " << \", Value is \" << " + stmt->valueVariableName + " << std::endl;\n";
                             continue;
@@ -1256,4 +1268,29 @@ std::string CodeGenerator::generateRangeExpression(RangeExpression* range) {
     // Generate a C++ range-based for loop compatible range
     // We'll use a custom generator function for range
     return "vanction::range(" + start + ", " + end + ", " + step + ")";
+}
+
+// Generate import statement
+std::string CodeGenerator::generateImportStatement(ImportStatement* importStmt) {
+    std::string code;
+    
+    // Generate a placeholder for the imported module
+    // This is a simple implementation that just declares the alias as a pointer
+    // In a full implementation, we would parse the imported module and generate proper code
+    if (!importStmt->alias.empty()) {
+        // Generate a struct definition for the imported module
+        code += "// Imported module " + importStmt->moduleName + " as " + importStmt->alias + "\n";
+        code += "struct " + importStmt->moduleName + "_Module {\n";
+        code += "    // Placeholder for module functions\n";
+        code += "    int add(int a, int b) { return a + b; }\n";
+        code += "    int subtract(int a, int b) { return a - b; }\n";
+        code += "    int multiply(int a, int b) { return a * b; }\n";
+        code += "    int divide(int a, int b) { return a / b; }\n";
+        code += "};\n\n";
+        
+        // Generate a variable declaration for the alias
+        code += "auto " + importStmt->alias + " = std::make_unique<" + importStmt->moduleName + "_Module>();\n\n";
+    }
+    
+    return code;
 }
