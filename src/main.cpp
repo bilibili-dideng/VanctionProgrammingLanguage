@@ -159,7 +159,7 @@ class HashMap;
 class Instance;
 
 // Define Value type
-using Value = std::variant<int, char, std::string, bool, float, double, std::monostate, Instance*, ErrorObject*, List*, HashMap*, LambdaExpression*>;
+using Value = std::variant<int, char, std::string, bool, float, double, std::monostate, Instance*, ErrorObject*, List*, HashMap*, LambdaExpression*, FunctionDeclaration*>;
 
 // Class definition structure
 struct ClassDefinition {
@@ -418,6 +418,11 @@ Value executeFunctionDeclaration(FunctionDeclaration* func) {
     // Store function in global function environment
     functions[func->name] = func;
     
+    // Add the function to the current variable environment as well
+    // This allows nested functions to be returned as values (closures)
+    variables[func->name] = func;
+    variableTypes[func->name] = "function";
+    
     // Only execute main function in interpret mode
     if (func->name == "main") {
         // Execute function body
@@ -429,7 +434,10 @@ Value executeFunctionDeclaration(FunctionDeclaration* func) {
             }
         }
     }
-    return std::monostate{};
+    
+    // Return the function itself as a value, enabling closure functionality
+    // This allows nested functions to be returned and called later
+    return func;
 }
 
 // Execute if statement
@@ -538,6 +546,26 @@ Value executeStatement(ASTNode* stmt, bool* shouldReturn) {
         Value result = std::monostate{};
         if (returnStmt->expression) {
             result = executeExpression(returnStmt->expression);
+            
+            // If we're returning a FunctionDeclaration*, create a new closure environment
+            // This ensures each returned function gets its own independent environment
+            if (std::holds_alternative<FunctionDeclaration*>(result)) {
+                FunctionDeclaration* funcDecl = std::get<FunctionDeclaration*>(result);
+                
+                // Create a copy of the current variable environment for this closure
+                // Store it as a pair of maps: (variables, variableTypes)
+                auto closureEnv = new std::pair<std::map<std::string, Value>, std::map<std::string, std::string>>();
+                
+                // Get the current environment, including any variables from outer scopes
+                closureEnv->first = variables;
+                closureEnv->second = variableTypes;
+                
+                // Set the closure environment for this function instance
+                funcDecl->closureEnv = closureEnv;
+                
+                // Update the result with the function that has the closure environment
+                result = funcDecl;
+            }
         }
         // Set return flag
         if (shouldReturn) {
@@ -1773,9 +1801,10 @@ Value executeExpression(Expression* expr) {
         // Store it as a pair of maps: (variables, variableTypes)
         auto closureEnv = new std::pair<std::map<std::string, Value>, std::map<std::string, std::string>>();
         
-        // Get the current environment, including any variables from outer scopes
-        // This is important for nested lambdas to access variables from their outer lambdas
-        closureEnv->first = variables;
+        // Deep copy the current environment, including any variables from outer scopes
+        // This ensures each lambda has its own independent environment copy
+        // Important for closures that capture changing variables
+        closureEnv->first = variables;  // std::map的赋值运算符已经是深拷贝
         closureEnv->second = variableTypes;
         
         // Set the closure environment for the lambda
@@ -1849,10 +1878,72 @@ Value executeFunctionCall(FunctionCall* call) {
                 variableTypes = savedVariableTypes;
                 
                 return result;
+            } else if (std::holds_alternative<FunctionDeclaration*>(funcVal)) {
+                // Execute FunctionDeclaration* as closure
+                FunctionDeclaration* funcDecl = std::get<FunctionDeclaration*>(funcVal);
+                
+                // Execute function with arguments
+                std::vector<Value> args;
+                for (auto argExpr : call->arguments) {
+                    args.push_back(executeExpression(argExpr));
+                }
+                
+                // Save current variable environment
+                auto savedVariables = variables;
+                auto savedVariableTypes = variableTypes;
+                
+                // Create a new variable environment for the function execution
+                std::map<std::string, Value> funcVariables = variables;
+                std::map<std::string, std::string> funcVariableTypes = variableTypes;
+                
+                // If function has a closure environment, use it as the base environment
+                // This ensures nested functions can access variables from outer scopes
+                if (funcDecl->closureEnv) {
+                    auto closureEnv = static_cast<std::pair<std::map<std::string, Value>, std::map<std::string, std::string>>*>(funcDecl->closureEnv);
+                    // Use closure environment as base
+                    funcVariables = closureEnv->first;
+                    funcVariableTypes = closureEnv->second;
+                }
+                
+                // Assign arguments to parameters in the function's environment
+                for (size_t i = 0; i < funcDecl->parameters.size() && i < args.size(); i++) {
+                    const std::string& paramName = funcDecl->parameters[i].name;
+                    funcVariables[paramName] = args[i];
+                    funcVariableTypes[paramName] = "auto";
+                }
+                
+                // Switch to function-specific environment
+                variables = funcVariables;
+                variableTypes = funcVariableTypes;
+                
+                // Execute function body
+                Value returnValue = std::monostate{};
+                bool shouldReturn = false;
+                for (auto stmt : funcDecl->body) {
+                    returnValue = executeStatement(stmt, &shouldReturn);
+                    if (shouldReturn) {
+                        break;
+                    }
+                }
+                
+                // Update the original closure environment with the modified variables
+                // This ensures that the closure state is preserved between calls
+                if (funcDecl->closureEnv) {
+                    auto closureEnv = static_cast<std::pair<std::map<std::string, Value>, std::map<std::string, std::string>>*>(funcDecl->closureEnv);
+                    // Update the closure environment with the modified variables
+                    closureEnv->first = variables;
+                    closureEnv->second = variableTypes;
+                }
+                
+                // Restore original variables
+                variables = savedVariables;
+                variableTypes = savedVariableTypes;
+                
+                return returnValue;
             }
         }
         // Then check variables map
-        else if (variables.find(call->methodName) != variables.end()) {
+        if (variables.find(call->methodName) != variables.end()) {
             Value funcVal = variables[call->methodName];
             if (std::holds_alternative<LambdaExpression*>(funcVal)) {
                 LambdaExpression* lambdaExpr = std::get<LambdaExpression*>(funcVal);
@@ -1898,6 +1989,68 @@ Value executeFunctionCall(FunctionCall* call) {
                 variableTypes = savedVariableTypes;
                 
                 return result;
+            } else if (std::holds_alternative<FunctionDeclaration*>(funcVal)) {
+                // Execute FunctionDeclaration* as closure
+                FunctionDeclaration* funcDecl = std::get<FunctionDeclaration*>(funcVal);
+                
+                // Execute function with arguments
+                std::vector<Value> args;
+                for (auto argExpr : call->arguments) {
+                    args.push_back(executeExpression(argExpr));
+                }
+                
+                // Save current variable environment
+                auto savedVariables = variables;
+                auto savedVariableTypes = variableTypes;
+                
+                // Create a new variable environment for the function execution
+                std::map<std::string, Value> funcVariables = variables;
+                std::map<std::string, std::string> funcVariableTypes = variableTypes;
+                
+                // If function has a closure environment, use it as the base environment
+                // This ensures nested functions can access variables from outer scopes
+                if (funcDecl->closureEnv) {
+                    auto closureEnv = static_cast<std::pair<std::map<std::string, Value>, std::map<std::string, std::string>>*>(funcDecl->closureEnv);
+                    // Use closure environment as base
+                    funcVariables = closureEnv->first;
+                    funcVariableTypes = closureEnv->second;
+                }
+                
+                // Assign arguments to parameters in the function's environment
+                for (size_t i = 0; i < funcDecl->parameters.size() && i < args.size(); i++) {
+                    const std::string& paramName = funcDecl->parameters[i].name;
+                    funcVariables[paramName] = args[i];
+                    funcVariableTypes[paramName] = "auto";
+                }
+                
+                // Switch to function-specific environment
+                variables = funcVariables;
+                variableTypes = funcVariableTypes;
+                
+                // Execute function body
+                Value returnValue = std::monostate{};
+                bool shouldReturn = false;
+                for (auto stmt : funcDecl->body) {
+                    returnValue = executeStatement(stmt, &shouldReturn);
+                    if (shouldReturn) {
+                        break;
+                    }
+                }
+                
+                // Update the original closure environment with the modified variables
+                // This ensures that the closure state is preserved between calls
+                if (funcDecl->closureEnv) {
+                    auto closureEnv = static_cast<std::pair<std::map<std::string, Value>, std::map<std::string, std::string>>*>(funcDecl->closureEnv);
+                    // Update the closure environment with the modified variables
+                    closureEnv->first = variables;
+                    closureEnv->second = variableTypes;
+                }
+                
+                // Restore original variables
+                variables = savedVariables;
+                variableTypes = savedVariableTypes;
+                
+                return returnValue;
             }
         }
     }

@@ -1,0 +1,28 @@
+func make_counter() {
+    var count = 0;
+    
+    func increment() {
+        count = count + 1;
+        return count;
+    }
+    
+    return increment;
+}
+
+func test_closure(abc) {
+    func map() {
+        return abc;
+    }
+    return map;
+}
+
+func main() {
+    var counter = make_counter();
+    System.print(counter());  || 输出: 1
+    System.print(counter());  || 输出: 2
+    System.print(counter());  || 输出: 3
+
+    var closure_func = test_closure(32);
+    System.print(closure_func());  || 输出: 32
+    return 0;
+}

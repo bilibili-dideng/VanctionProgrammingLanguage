@@ -35,8 +35,12 @@ public:
     std::vector<FunctionParameter> parameters;
     std::vector<ASTNode*> body;
     
+    // For closures: save the variable environment when the function is created
+    // We'll use void* to store the actual environment, which will be cast to the appropriate type at runtime
+    void* closureEnv;
+    
     FunctionDeclaration(const std::string& returnType, const std::string& name)
-        : returnType(returnType), name(name) {}
+        : returnType(returnType), name(name), closureEnv(nullptr) {}
     
     ~FunctionDeclaration() {
         for (auto node : body) {
