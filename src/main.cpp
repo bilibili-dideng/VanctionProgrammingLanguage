@@ -11,6 +11,7 @@
 #include <variant>
 #include <any>
 #include <stdexcept>
+#include <functional>
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -156,7 +157,9 @@ class HashMap;
 // Type for variable values - extended to include data structures and Instance* for objects
 // Forward declaration for Instance type
 class Instance;
-using Value = std::variant<int, char, std::string, bool, float, double, std::monostate, Instance*, ErrorObject*, List*, HashMap*>;
+
+// Define Value type
+using Value = std::variant<int, char, std::string, bool, float, double, std::monostate, Instance*, ErrorObject*, List*, HashMap*, LambdaExpression*>;
 
 // Class definition structure
 struct ClassDefinition {
@@ -640,8 +643,55 @@ Value executeStatement(ASTNode* stmt, bool* shouldReturn) {
     } else if (auto forInStmt = dynamic_cast<ForInLoopStatement*>(stmt)) {
         // Execute for-in loop
         
+        // First, execute the collection expression to get the actual collection object
+        Value collectionValue = executeExpression(forInStmt->collection);
+        
+        // Handle List* object (from variable or expression)
+        if (std::holds_alternative<List*>(collectionValue)) {
+            List* list = std::get<List*>(collectionValue);
+            // Iterate over list elements
+            for (size_t i = 0; i < list->elements.size(); ++i) {
+                // Get element value
+                Value elementValue = list->elements[i];
+                
+                // Store current element in loop variable
+                variables[forInStmt->keyVariableName] = elementValue;
+                
+                // Execute loop body
+                for (auto bodyStmt : forInStmt->body) {
+                    bool bodyShouldReturn = false;
+                    Value bodyResult = executeStatement(bodyStmt, &bodyShouldReturn);
+                    if (bodyShouldReturn) {
+                        return bodyResult;
+                    }
+                }
+            }
+        }
+        // Handle HashMap* object (from variable or expression)
+        else if (std::holds_alternative<HashMap*>(collectionValue)) {
+            HashMap* hashMap = std::get<HashMap*>(collectionValue);
+            // Iterate over hash map entries
+            for (auto& entry : hashMap->entries) {
+                // Get key and value
+                std::string key = entry.first;
+                Value value = entry.second;
+                
+                // Store current key and value in loop variables
+                variables[forInStmt->keyVariableName] = key;
+                variables[forInStmt->valueVariableName] = value;
+                
+                // Execute loop body
+                for (auto bodyStmt : forInStmt->body) {
+                    bool bodyShouldReturn = false;
+                    Value bodyResult = executeStatement(bodyStmt, &bodyShouldReturn);
+                    if (bodyShouldReturn) {
+                        return bodyResult;
+                    }
+                }
+            }
+        }
         // Handle ListLiteral
-        if (auto listLit = dynamic_cast<ListLiteral*>(forInStmt->collection)) {
+        else if (auto listLit = dynamic_cast<ListLiteral*>(forInStmt->collection)) {
             // Iterate over list elements
             for (auto elementExpr : listLit->elements) {
                 // Execute element expression and get value
@@ -815,6 +865,45 @@ Value executeStatement(ASTNode* stmt, bool* shouldReturn) {
             }
         } while (true);
         return std::monostate{};
+    } else if (auto switchStmt = dynamic_cast<SwitchStatement*>(stmt)) {
+        // Execute switch statement
+        // First, execute the switch expression
+        Value switchValue = executeExpression(switchStmt->expression);
+        
+        // Iterate through all case statements
+        for (auto caseStmt : switchStmt->cases) {
+            // Execute case expression
+            Value caseValue = executeExpression(caseStmt->value);
+            
+            // Compare case value with switch value
+            bool match = false;
+            
+            // Handle different types of comparisons
+            if (std::holds_alternative<int>(switchValue) && std::holds_alternative<int>(caseValue)) {
+                match = (std::get<int>(switchValue) == std::get<int>(caseValue));
+            } else if (std::holds_alternative<std::string>(switchValue) && std::holds_alternative<std::string>(caseValue)) {
+                match = (std::get<std::string>(switchValue) == std::get<std::string>(caseValue));
+            } else if (std::holds_alternative<bool>(switchValue) && std::holds_alternative<bool>(caseValue)) {
+                match = (std::get<bool>(switchValue) == std::get<bool>(caseValue));
+            } else if (std::holds_alternative<float>(switchValue) && std::holds_alternative<float>(caseValue)) {
+                match = (std::get<float>(switchValue) == std::get<float>(caseValue));
+            } else if (std::holds_alternative<double>(switchValue) && std::holds_alternative<double>(caseValue)) {
+                match = (std::get<double>(switchValue) == std::get<double>(caseValue));
+            }
+            
+            // If case matches, execute the case body
+            if (match) {
+                for (auto bodyStmt : caseStmt->body) {
+                    bool bodyShouldReturn = false;
+                    Value bodyResult = executeStatement(bodyStmt, &bodyShouldReturn);
+                    if (bodyShouldReturn) {
+                        return bodyResult;
+                    }
+                }
+                // Fallthrough behavior - continue to next case
+            }
+        }
+        return std::monostate{};
     } else if (auto funcDecl = dynamic_cast<FunctionDeclaration*>(stmt)) {
         // Execute nested function declaration
         return executeFunctionDeclaration(funcDecl);
@@ -827,6 +916,71 @@ Value executeExpression(Expression* expr) {
     if (auto funcCall = dynamic_cast<FunctionCall*>(expr)) {
         // Execute function call
         return executeFunctionCall(funcCall);
+    } else if (auto funcCallExpr = dynamic_cast<FunctionCallExpression*>(expr)) {
+        // Execute function call expression (for lambdas, etc.)
+        // First execute the callee to get the function
+        Value calleeValue = executeExpression(funcCallExpr->callee);
+        
+        // Check if it's a lambda expression
+        if (LambdaExpression** lambdaPtr = std::get_if<LambdaExpression*>(&calleeValue)) {
+            LambdaExpression* lambda = *lambdaPtr;
+            // Bind arguments to parameters
+            if (lambda->parameters.size() != funcCallExpr->arguments.size()) {
+                throw vanction_error::MethodError("Argument count mismatch for lambda call");
+            }
+            
+            // Execute arguments
+            std::vector<Value> argValues;
+            for (auto arg : funcCallExpr->arguments) {
+                argValues.push_back(executeExpression(arg));
+            }
+            
+            // Create a copy of the current variables to save the state
+            std::map<std::string, Value> originalVariables = variables;
+            std::map<std::string, std::string> originalVariableTypes = variableTypes;
+            
+            // Bind parameters to argument values in the current environment
+            // This is important for nested lambdas to access outer lambda parameters
+            std::map<std::string, Value> tempVariables = variables;
+            std::map<std::string, std::string> tempVariableTypes = variableTypes;
+            
+            for (size_t i = 0; i < lambda->parameters.size(); i++) {
+                const std::string& paramName = lambda->parameters[i].name;
+                tempVariables[paramName] = argValues[i];
+                tempVariableTypes[paramName] = "auto";
+            }
+            
+            // If lambda has a closure environment, merge it into the temp environment
+            // This ensures we have all variables from outer scopes
+            if (lambda->closureEnv) {
+                auto closureEnv = static_cast<std::pair<std::map<std::string, Value>, std::map<std::string, std::string>>*>(lambda->closureEnv);
+                for (const auto& pair : closureEnv->first) {
+                    if (tempVariables.find(pair.first) == tempVariables.end()) {
+                        tempVariables[pair.first] = pair.second;
+                    }
+                }
+                for (const auto& pair : closureEnv->second) {
+                    if (tempVariableTypes.find(pair.first) == tempVariableTypes.end()) {
+                        tempVariableTypes[pair.first] = pair.second;
+                    }
+                }
+            }
+            
+            // Set the temp environment as current for execution
+            variables = tempVariables;
+            variableTypes = tempVariableTypes;
+            
+            // Execute the lambda body
+            Value result = executeExpression(lambda->body);
+            
+            // Restore original variables
+            variables = originalVariables;
+            variableTypes = originalVariableTypes;
+            
+            return result;
+        } else {
+            throw vanction_error::MethodError("Attempt to call a non-function value");
+        }
     } else if (auto assignExpr = dynamic_cast<AssignmentExpression*>(expr)) {
         // Execute assignment expression
         Value value = executeExpression(assignExpr->right);
@@ -1091,6 +1245,37 @@ Value executeExpression(Expression* expr) {
                         return std::get<bool>(val) ? "true" : "false";
                     } else if (std::holds_alternative<char>(val)) {
                         return std::string(1, std::get<char>(val));
+                    } else if (std::holds_alternative<List*>(val)) {
+                        List* list = std::get<List*>(val);
+                        std::string result = "[";
+                        for (size_t i = 0; i < list->elements.size(); ++i) {
+                            // Recursively convert each element to string
+                            Value elem = list->elements[i];
+                            std::string elemStr;
+                            if (std::holds_alternative<std::string>(elem)) {
+                                elemStr = std::get<std::string>(elem);
+                            } else if (std::holds_alternative<int>(elem)) {
+                                elemStr = std::to_string(std::get<int>(elem));
+                            } else if (std::holds_alternative<float>(elem)) {
+                                elemStr = std::to_string(std::get<float>(elem));
+                            } else if (std::holds_alternative<double>(elem)) {
+                                elemStr = std::to_string(std::get<double>(elem));
+                            } else if (std::holds_alternative<bool>(elem)) {
+                                elemStr = std::get<bool>(elem) ? "true" : "false";
+                            } else if (std::holds_alternative<char>(elem)) {
+                                elemStr = std::string(1, std::get<char>(elem));
+                            } else {
+                                elemStr = "unknown";
+                            }
+                            result += elemStr;
+                            if (i < list->elements.size() - 1) {
+                                result += ", ";
+                            }
+                        }
+                        result += "]";
+                        return result;
+                    } else if (std::holds_alternative<HashMap*>(val)) {
+                        return "{...}";
                     } else {
                         // Handle monostate (which is what our skipped method calls return)
                         return "";
@@ -1274,7 +1459,11 @@ Value executeExpression(Expression* expr) {
         std::string className = instanceCreation->className;
         
         if (debugMode) {
-            std::cout << "[DEBUG] Creating instance of class: " << className << std::endl;
+            std::cout << "[DEBUG] Creating instance of class: " << className;
+            if (!instanceCreation->namespaceName.empty()) {
+                std::cout << " (namespace: " << instanceCreation->namespaceName << ")";
+            }
+            std::cout << std::endl;
         }
         
         // Check if class exists
@@ -1579,6 +1768,21 @@ Value executeExpression(Expression* expr) {
             map->set(key, valueValue);
         }
         return map;
+    } else if (auto lambdaExpr = dynamic_cast<LambdaExpression*>(expr)) {
+        // Create a copy of the current variable environment for closure
+        // Store it as a pair of maps: (variables, variableTypes)
+        auto closureEnv = new std::pair<std::map<std::string, Value>, std::map<std::string, std::string>>();
+        
+        // Get the current environment, including any variables from outer scopes
+        // This is important for nested lambdas to access variables from their outer lambdas
+        closureEnv->first = variables;
+        closureEnv->second = variableTypes;
+        
+        // Set the closure environment for the lambda
+        lambdaExpr->closureEnv = closureEnv;
+        
+        // Return the lambda expression directly as a value
+        return lambdaExpr;
     }
     
     // Default return value
@@ -1594,6 +1798,110 @@ Value executeFunctionCall(FunctionCall* call) {
         }
         std::cout << call->methodName << "(" << call->arguments.size() << " arguments)" << std::endl;
     }
+    
+    // Check if this is a lambda function call (variable name followed by parentheses)
+    if (call->objectName.empty()) {
+        // Check if the method name corresponds to a variable that's a lambda function
+        // First check constants map
+        if (constants.find(call->methodName) != constants.end()) {
+            Value funcVal = constants[call->methodName];
+            if (std::holds_alternative<LambdaExpression*>(funcVal)) {
+                LambdaExpression* lambdaExpr = std::get<LambdaExpression*>(funcVal);
+                // Execute lambda function with arguments
+                std::vector<Value> args;
+                for (auto argExpr : call->arguments) {
+                    args.push_back(executeExpression(argExpr));
+                }
+                
+                // Save current variable environment
+                auto savedVariables = variables;
+                auto savedVariableTypes = variableTypes;
+                
+                // Create a new variable environment for the lambda execution
+                std::map<std::string, Value> lambdaVariables = variables;
+                std::map<std::string, std::string> lambdaVariableTypes = variableTypes;
+                
+                // If lambda has a closure environment, use it as the base environment
+                // This ensures nested lambdas can access variables from outer scopes
+                if (lambdaExpr->closureEnv) {
+                    auto closureEnv = static_cast<std::pair<std::map<std::string, Value>, std::map<std::string, std::string>>*>(lambdaExpr->closureEnv);
+                    // Use closure environment as base
+                    lambdaVariables = closureEnv->first;
+                    lambdaVariableTypes = closureEnv->second;
+                }
+                
+                // Assign arguments to parameters in the lambda's environment
+                for (size_t i = 0; i < lambdaExpr->parameters.size() && i < args.size(); i++) {
+                    const std::string& paramName = lambdaExpr->parameters[i].name;
+                    lambdaVariables[paramName] = args[i];
+                    lambdaVariableTypes[paramName] = "auto";
+                }
+                
+                // Switch to lambda-specific environment
+                variables = lambdaVariables;
+                variableTypes = lambdaVariableTypes;
+                
+                // Execute the lambda body
+                Value result = executeExpression(lambdaExpr->body);
+                
+                // Restore original variables
+                variables = savedVariables;
+                variableTypes = savedVariableTypes;
+                
+                return result;
+            }
+        }
+        // Then check variables map
+        else if (variables.find(call->methodName) != variables.end()) {
+            Value funcVal = variables[call->methodName];
+            if (std::holds_alternative<LambdaExpression*>(funcVal)) {
+                LambdaExpression* lambdaExpr = std::get<LambdaExpression*>(funcVal);
+                // Execute lambda function with arguments
+                std::vector<Value> args;
+                for (auto argExpr : call->arguments) {
+                    args.push_back(executeExpression(argExpr));
+                }
+                
+                // Save current variable environment
+                auto savedVariables = variables;
+                auto savedVariableTypes = variableTypes;
+                
+                // Create a new variable environment for the lambda execution
+                std::map<std::string, Value> lambdaVariables = variables;
+                std::map<std::string, std::string> lambdaVariableTypes = variableTypes;
+                
+                // If lambda has a closure environment, use it as the base environment
+                // This ensures nested lambdas can access variables from outer scopes
+                if (lambdaExpr->closureEnv) {
+                    auto closureEnv = static_cast<std::pair<std::map<std::string, Value>, std::map<std::string, std::string>>*>(lambdaExpr->closureEnv);
+                    // Use closure environment as base
+                    lambdaVariables = closureEnv->first;
+                    lambdaVariableTypes = closureEnv->second;
+                }
+                
+                // Assign arguments to parameters in the lambda's environment
+                for (size_t i = 0; i < lambdaExpr->parameters.size() && i < args.size(); i++) {
+                    const std::string& paramName = lambdaExpr->parameters[i].name;
+                    lambdaVariables[paramName] = args[i];
+                    lambdaVariableTypes[paramName] = "auto";
+                }
+                
+                // Switch to lambda-specific environment
+                variables = lambdaVariables;
+                variableTypes = lambdaVariableTypes;
+                
+                // Execute the lambda body
+                Value result = executeExpression(lambdaExpr->body);
+                
+                // Restore original variables
+                variables = savedVariables;
+                variableTypes = savedVariableTypes;
+                
+                return result;
+            }
+        }
+    }
+    
     if ((call->methodName == "print" && call->objectName.empty()) || (call->objectName == "System" && call->methodName == "print")) {
         // Handle both print() and System.print()
         for (size_t i = 0; i < call->arguments.size(); ++i) {
@@ -1840,11 +2148,19 @@ Value executeFunctionCall(FunctionCall* call) {
         
         return returnValue;
     } else {
-        // Check if it's a class method call (e.g., class.method())
-        if (call->objectName == "class") {
-            // In Vanction, class.greet() calls the greet method on the Person class
-            // This is a special syntax for class methods
-            std::string className = "Person"; // Default to Person class for this syntax
+        // Check if it's a class method call (e.g., Person.init() or class.method())
+        if (call->objectName == "class" || classes.find(call->objectName) != classes.end()) {
+            // Handle both class.method() and Person.method() syntax
+            std::string className;
+            if (call->objectName == "class") {
+                // In Vanction, class.greet() calls the greet method on the Person class
+                // This is a special syntax for class methods
+                className = "Person"; // Default to Person class for this syntax
+            } else {
+                // Handle Person.method() syntax
+                className = call->objectName;
+            }
+            
             std::string methodName = call->methodName;
             
             if (classes.find(className) == classes.end()) {
@@ -1852,6 +2168,62 @@ Value executeFunctionCall(FunctionCall* call) {
             }
             
             ClassDefinition* classDef = classes[className];
+            
+            // Special handling for init method
+            if (methodName == "init") {
+                // This is an init method call like Person.init(instance, name, age)
+                // Check if we have at least one argument (the instance)
+                if (call->arguments.empty()) {
+                    throw vanction_error::MethodError("Init method expects at least one argument (instance)");
+                }
+                
+                // Get the instance argument
+                Value instanceArg = executeExpression(call->arguments[0]);
+                if (!std::holds_alternative<Instance*>(instanceArg)) {
+                    throw vanction_error::MethodError("First argument to init must be an instance");
+                }
+                
+                Instance* instance = std::get<Instance*>(instanceArg);
+                
+                // Save current variable environment
+                auto savedVariables = variables;
+                
+                // Create a new variable environment for the init method execution
+                std::map<std::string, Value> initVariables = variables;
+                
+                // Set the instance parameter to the current instance
+                if (classDef->initMethod->parameters.size() > 0) {
+                    initVariables[classDef->initMethod->parameters[0].name] = instance;
+                }
+                // Also explicitly add 'instance' variable for backward compatibility
+                initVariables["instance"] = instance;
+                
+                // Assign init method arguments to parameters, starting from index 1
+                for (size_t i = 1; i < call->arguments.size(); ++i) {
+                    size_t paramIndex = i;
+                    if (paramIndex < classDef->initMethod->parameters.size()) {
+                        Value argValue = executeExpression(call->arguments[i]);
+                        initVariables[classDef->initMethod->parameters[paramIndex].name] = argValue;
+                    }
+                }
+                
+                // Switch to init method-specific environment
+                variables = initVariables;
+                
+                // Execute init method body
+                for (auto stmt : classDef->initMethod->body) {
+                    bool shouldReturn = false;
+                    executeStatement(stmt, &shouldReturn);
+                    if (shouldReturn) {
+                        break;
+                    }
+                }
+                
+                // Restore saved variable environment
+                variables = savedVariables;
+                
+                return std::monostate{};
+            }
             
             // Find the class method
             ClassMethodDeclaration* method = nullptr;
@@ -2578,9 +2950,10 @@ int main(int argc, char* argv[]) {
             if (result == 0) {
                 std::cout << "GCC compilation successful!" << std::endl;
                 
-                // Clean up temporary file
-                std::remove(cppFile.c_str());
-                std::cout << "Cleaned up temporary files" << std::endl;
+                // Always preserve generated C++ file for debugging
+                std::cout << "Generated C++ code preserved at: " << cppFile << std::endl;
+                // std::remove(cppFile.c_str());
+                // std::cout << "Cleaned up temporary files" << std::endl;
             } else {
                 Error error(ErrorType::CompilationError, "GCC compilation failed", filePath, 1, 1);
                 errorReporter.report(error);

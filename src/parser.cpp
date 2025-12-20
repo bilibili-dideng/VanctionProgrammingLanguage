@@ -658,6 +658,7 @@ Statement* Parser::parseForLoopStatement() {
     
     // Parse initialization (allow variable declaration or assignment)
     Statement* initialization = nullptr;
+    bool isVarDecl = false;
     
     // Check if it's an assignment expression
     if (currentToken.type == IDENTIFIER) {
@@ -670,18 +671,20 @@ Statement* Parser::parseForLoopStatement() {
             initialization = new ExpressionStatement(expr);
         } else {
             // It's a variable declaration, parse it as statement
-            // This approach doesn't require private member access
             currentToken = nextToken;
-            // Reconstruct the token stream by parsing the statement
             initialization = parseStatement();
+            isVarDecl = true; // Variable declaration already consumed semicolon
         }
     } else {
         // It's a variable declaration, parse it as statement
         initialization = parseStatement();
+        isVarDecl = true; // Variable declaration already consumed semicolon
     }
     
-    // Expect semicolon after initialization
-    consume(SEMICOLON);
+    // Only consume semicolon if it's not a variable declaration (which already consumed semicolon)
+    if (!isVarDecl) {
+        consume(SEMICOLON);
+    }
     
     // Parse condition
     auto condition = parseExpression();
@@ -840,6 +843,13 @@ Statement* Parser::parseSwitchStatement() {
 
 // Parse statement
 Statement* Parser::parseStatement() {
+    // Skip comments
+    if (currentToken.type == COMMENT) {
+        // Move to next token
+        currentToken = lexer->getNextToken();
+        return nullptr;
+    }
+    
     // Check for variable declaration
     if (currentToken.type == KEYWORD && 
         (currentToken.value == "int" || currentToken.value == "char" || currentToken.value == "string" || 
@@ -1002,8 +1012,8 @@ Statement* Parser::parseStatement() {
             // Parse initialization as variable declaration
             Statement* initialization = parseStatement();
             
-            // Expect semicolon after initialization
-            consume(SEMICOLON);
+            // Don't consume semicolon after initialization if it was a variable declaration
+            // because parseVariableDeclaration already consumed it
             
             // Parse condition
             auto condition = parseExpression();
@@ -1184,44 +1194,74 @@ Expression* Parser::parseAssignmentExpression() {
         return new AssignmentExpression(left, right, line, column);
     } else if (currentToken.type == PLUS_ASSIGN) {
         consume(PLUS_ASSIGN);
+        int line = left->getLine();
+        int column = left->getColumn();
         auto right = parseAssignmentExpression();
-        return new BinaryExpression(left, "+", right);
+        // Generate j += 1 as j = j + 1
+        return new AssignmentExpression(left, new BinaryExpression(left, "+", right), line, column);
     } else if (currentToken.type == MINUS_ASSIGN) {
         consume(MINUS_ASSIGN);
+        int line = left->getLine();
+        int column = left->getColumn();
         auto right = parseAssignmentExpression();
-        return new BinaryExpression(left, "-", right);
+        // Generate j -= 1 as j = j - 1
+        return new AssignmentExpression(left, new BinaryExpression(left, "-", right), line, column);
     } else if (currentToken.type == MULTIPLY_ASSIGN) {
         consume(MULTIPLY_ASSIGN);
+        int line = left->getLine();
+        int column = left->getColumn();
         auto right = parseAssignmentExpression();
-        return new BinaryExpression(left, "*", right);
+        // Generate j *= 2 as j = j * 2
+        return new AssignmentExpression(left, new BinaryExpression(left, "*", right), line, column);
     } else if (currentToken.type == DIVIDE_ASSIGN) {
         consume(DIVIDE_ASSIGN);
+        int line = left->getLine();
+        int column = left->getColumn();
         auto right = parseAssignmentExpression();
-        return new BinaryExpression(left, "/", right);
+        // Generate j /= 2 as j = j / 2
+        return new AssignmentExpression(left, new BinaryExpression(left, "/", right), line, column);
     } else if (currentToken.type == MODULO_ASSIGN) {
         consume(MODULO_ASSIGN);
+        int line = left->getLine();
+        int column = left->getColumn();
         auto right = parseAssignmentExpression();
-        return new BinaryExpression(left, "%", right);
+        // Generate j %= 2 as j = j % 2
+        return new AssignmentExpression(left, new BinaryExpression(left, "%", right), line, column);
     } else if (currentToken.type == LSHIFT_ASSIGN) {
         consume(LSHIFT_ASSIGN);
+        int line = left->getLine();
+        int column = left->getColumn();
         auto right = parseAssignmentExpression();
-        return new BinaryExpression(left, "<<", right);
+        // Generate j <<= 1 as j = j << 1
+        return new AssignmentExpression(left, new BinaryExpression(left, "<<", right), line, column);
     } else if (currentToken.type == RSHIFT_ASSIGN) {
         consume(RSHIFT_ASSIGN);
+        int line = left->getLine();
+        int column = left->getColumn();
         auto right = parseAssignmentExpression();
-        return new BinaryExpression(left, ">>", right);
+        // Generate j >>= 1 as j = j >> 1
+        return new AssignmentExpression(left, new BinaryExpression(left, ">>", right), line, column);
     } else if (currentToken.type == AND_ASSIGN) {
         consume(AND_ASSIGN);
+        int line = left->getLine();
+        int column = left->getColumn();
         auto right = parseAssignmentExpression();
-        return new BinaryExpression(left, "&", right);
+        // Generate j &= 1 as j = j & 1
+        return new AssignmentExpression(left, new BinaryExpression(left, "&", right), line, column);
     } else if (currentToken.type == OR_ASSIGN) {
         consume(OR_ASSIGN);
+        int line = left->getLine();
+        int column = left->getColumn();
         auto right = parseAssignmentExpression();
-        return new BinaryExpression(left, "|", right);
+        // Generate j |= 1 as j = j | 1
+        return new AssignmentExpression(left, new BinaryExpression(left, "|", right), line, column);
     } else if (currentToken.type == XOR_ASSIGN) {
         consume(XOR_ASSIGN);
+        int line = left->getLine();
+        int column = left->getColumn();
         auto right = parseAssignmentExpression();
-        return new BinaryExpression(left, "^", right);
+        // Generate j ^= 1 as j = j ^ 1
+        return new AssignmentExpression(left, new BinaryExpression(left, "^", right), line, column);
     }
     
     return left;
@@ -1234,32 +1274,32 @@ Expression* Parser::parseMultiplicativeExpression() {
         int line = currentToken.line;
         int column = currentToken.column;
         consume(MINUS);
-        auto right = parsePrimaryExpression();
+        auto right = parsePostfixExpression();
         // Create a binary expression with 0 as left operand and right as right operand
         auto zero = new IntegerLiteral(0, line, column);
         return new BinaryExpression(zero, "-", right, line, column);
     }
     
-    auto left = parsePrimaryExpression();
+    auto left = parsePostfixExpression();
     
     while (true) {
         if (currentToken.type == MULTIPLY) {
         int line = currentToken.line;
         int column = currentToken.column;
         consume(MULTIPLY);
-        auto right = parsePrimaryExpression();
+        auto right = parsePostfixExpression();
         left = new BinaryExpression(left, "*", right, line, column);
     } else if (currentToken.type == DIVIDE) {
         int line = currentToken.line;
         int column = currentToken.column;
         consume(DIVIDE);
-        auto right = parsePrimaryExpression();
+        auto right = parsePostfixExpression();
         left = new BinaryExpression(left, "/", right, line, column);
     } else if (currentToken.type == MODULO) {
         int line = currentToken.line;
         int column = currentToken.column;
         consume(MODULO);
-        auto right = parsePrimaryExpression();
+        auto right = parsePostfixExpression();
         left = new BinaryExpression(left, "%", right, line, column);
         } else {
             break;
@@ -1404,8 +1444,107 @@ Expression* Parser::parseBinaryExpression() {
     return parseComparisonExpression();
 }
 
+// Parse postfix expression (function calls, etc.)
+Expression* Parser::parsePostfixExpression() {
+    Expression* expr = parsePrimaryExpression();
+    
+    // Check for function call (e.g., expr())
+    while (currentToken.type == LPAREN) {
+        int line = currentToken.line;
+        int column = currentToken.column;
+        consume(LPAREN);
+        
+        // Parse arguments
+        std::vector<Expression*> arguments;
+        if (currentToken.type != RPAREN) {
+            // Parse first argument
+            Expression* arg = parseExpression();
+            if (arg) {
+                arguments.push_back(arg);
+            }
+            
+            // Parse additional arguments
+            while (currentToken.type == COMMA) {
+                consume(COMMA);
+                arg = parseExpression();
+                if (arg) {
+                    arguments.push_back(arg);
+                }
+            }
+        }
+        
+        // Consume right parenthesis
+        consume(RPAREN);
+        
+        // Create function call expression
+        // Check if it's a direct function call (not a method call)
+        expr = new FunctionCallExpression(expr, arguments, line, column);
+    }
+    
+    return expr;
+}
+
 // Parse primary expression
 Expression* Parser::parsePrimaryExpression() {
+    // Check for parenthesized expression
+    if (currentToken.type == LPAREN) {
+        int line = currentToken.line;
+        int column = currentToken.column;
+        // Consume left parenthesis
+        consume(LPAREN);
+        
+        // Parse expression inside parentheses
+        Expression* expr = parseExpression();
+        
+        // Consume right parenthesis
+        consume(RPAREN);
+        
+        return expr;
+    }
+    
+    // Check for lambda expression
+    if (currentToken.type == KEYWORD && currentToken.value == "lambda") {
+        int line = currentToken.line;
+        int column = currentToken.column;
+        // Consume 'lambda' keyword
+        consume(KEYWORD);
+        
+        // Consume left parenthesis
+        consume(LPAREN);
+        
+        // Parse parameters
+        std::vector<FunctionParameter> parameters;
+        if (currentToken.type != RPAREN) {
+            // Parse first parameter
+            std::string paramName = currentToken.value;
+            consume(IDENTIFIER);
+            parameters.emplace_back(paramName);
+            
+            // Parse additional parameters
+            while (currentToken.type == COMMA) {
+                consume(COMMA);
+                paramName = currentToken.value;
+                consume(IDENTIFIER);
+                parameters.emplace_back(paramName);
+            }
+        }
+        
+        // Consume right parenthesis
+        consume(RPAREN);
+        
+        // Consume arrow ->
+        // First consume minus
+        consume(MINUS);
+        // Then consume greater than
+        consume(GREATER_THAN);
+        
+        // Parse expression body
+        Expression* body = parseExpression();
+        
+        // Create and return lambda expression
+        return new LambdaExpression(parameters, body, line, column);
+    }
+    
     // Check for instance creation or instance access (e.g., instance ClassName() or instance.member)
     if (currentToken.type == KEYWORD && currentToken.value == "instance") {
         // Create an Identifier object for "instance"
@@ -1771,8 +1910,12 @@ Expression* Parser::parsePrimaryExpression() {
                 // Advance to next token
                 consume(STRING_LITERAL);
                 
-                // Expect assignment operator
-                consume(ASSIGN);
+                // Expect either colon or assignment operator as key-value separator
+                if (currentToken.type == COLON || currentToken.type == ASSIGN) {
+                    consume(currentToken.type);
+                } else {
+                    throw vanction_error::SyntaxError("Expected colon or assignment operator as key-value separator", currentToken.line, currentToken.column);
+                }
                 
                 // Parse first value
                 Expression* valueExpr = parseExpression();
@@ -1833,8 +1976,12 @@ Expression* Parser::parsePrimaryExpression() {
                     // Advance to next token
                     consume(STRING_LITERAL);
                     
-                    // Expect assignment operator
-                    consume(ASSIGN);
+                    // Expect either colon or assignment operator as key-value separator
+                    if (currentToken.type == COLON || currentToken.type == ASSIGN) {
+                        consume(currentToken.type);
+                    } else {
+                        throw vanction_error::SyntaxError("Expected colon or assignment operator as key-value separator", currentToken.line, currentToken.column);
+                    }
                     
                     // Parse next value
                     valueExpr = parseExpression();

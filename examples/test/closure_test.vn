@@ -1,0 +1,38 @@
+|| 测试闭包功能
+func main() {
+    || 1. 嵌套lambda闭包测试
+    var make_adder = lambda (base) -> lambda (num) -> base + num;
+    
+    var add10 = make_adder(10);
+    var add20 = make_adder(20);
+    
+    System.print("Parameterized closure test:");
+    System.print(add10(5));   || 应该输出: 15
+    System.print(add20(5));   || 应该输出: 25
+    System.print(add10(10));  || 应该输出: 20
+    
+    || 2. 多重嵌套闭包测试
+    var outer = lambda (x) -> lambda (y) -> lambda (z) -> x + y + z;
+    var add5 = outer(5);
+    var add5and3 = add5(3);
+    
+    System.print("\nMultiple nested closures test:");
+    System.print(add5and3(2));  || 应该输出: 5 + 3 + 2 = 10
+    System.print(outer(2)(3)(4));  || 应该输出: 2 + 3 + 4 = 9
+    
+    || 3. 闭包访问外部变量测试
+    var global_base = 100;
+    var closure_with_global = lambda (num) -> global_base + num;
+    
+    System.print("\nClosure with global variable test:");
+    System.print(closure_with_global(50));  || 应该输出: 150
+    
+    || 4. 闭包作为参数传递
+    var apply_function = lambda (fn, val) -> fn(val);
+    var double_func = lambda (x) -> x * 2;
+    
+    System.print("\nClosure as parameter test:");
+    System.print(apply_function(double_func, 10));  || 应该输出: 20
+    
+    return 0;
+}

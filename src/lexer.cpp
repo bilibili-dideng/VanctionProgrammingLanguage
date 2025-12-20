@@ -37,23 +37,63 @@ Token Lexer::getNextToken() {
     }
     
     // Check for comment types
-    // Multi-line comment: |* ... *|
-    if (current == '|' && pos + 1 < source.length() && source[pos + 1] == '*') {
-        advance(); // Consume |
-        advance(); // Consume *
-        return parseMultiLineComment();
-    }
-    // Doc comment: |\ ... /|
-    else if (current == '|' && pos + 1 < source.length() && source[pos + 1] == '\\') {
-        advance(); // Consume |
-        advance(); // Consume \
-        return parseDocComment();
-    }
     // Single-line comment: || ...
-    else if (current == '|' && pos + 1 < source.length() && source[pos + 1] == '|') {
-        advance(); // Consume first |
-        advance(); // Consume second |
-        return parseComment();
+    if (current == '|' && pos + 1 < source.length()) {
+        char nextChar = source[pos + 1];
+        if (nextChar == '|') {
+            // Single-line comment: || ...
+            advance(); // Consume first |
+            advance(); // Consume second |
+            return parseComment();
+        } 
+        // Multi-line comment: |* ... *|
+        else if (nextChar == '*') {
+            advance(); // Consume |
+            advance(); // Consume *
+            return parseMultiLineComment();
+        }
+        // Doc comment: |\ ... /|
+        else if (nextChar == '\\') {
+            advance(); // Consume |
+            advance(); // Consume \
+            // Parse doc comment content until /|
+            size_t start = pos;
+            int start_line = line;
+            int start_column = column;
+            
+            // Find closing /|
+            while (pos + 1 < source.length()) {
+                if (source[pos] == '/' && source[pos + 1] == '|') {
+                    break;
+                }
+                // Advance character by character
+                if (source[pos] == '\n') {
+                    line++;
+                    column = 1;
+                } else {
+                    column++;
+                }
+                pos++;
+            }
+            
+            // Consume closing /|
+            if (pos + 1 < source.length()) {
+                // Consume /
+                column++;
+                pos++;
+                // Consume |
+                column++;
+                pos++;
+            }
+            
+            // Create comment token
+            Token token;
+            token.type = COMMENT;
+            token.value = source.substr(start, pos - start - 2);
+            token.line = start_line;
+            token.column = start_column;
+            return token;
+        }
     }
     
     // Check for string literal (with optional r or f prefix)
@@ -547,7 +587,9 @@ Token Lexer::parseIdentifierOrKeyword() {
         // Import keywords
         value == "import" || value == "using" || value == "to" ||
         // OOP keywords
-        value == "class" || value == "instance" || value == "init") {
+        value == "class" || value == "instance" || value == "init" ||
+        // Lambda expression keyword
+        value == "lambda") {
         token.type = KEYWORD;
         token.value = value;
         if (debugMode) {
@@ -657,9 +699,16 @@ Token Lexer::parseComment() {
     int start_line = line;
     int start_column = column;
     
-    // Skip comment until end of line or closing brace
-    while (pos < source.length() && source[pos] != '\n' && source[pos] != '}') {
-        advance();
+    // Skip comment until end of line, handling UTF-8 characters properly
+    while (pos < source.length()) {
+        // Check if we've reached the end of the line
+        if (source[pos] == '\n') {
+            break;
+        }
+        // Advance past the current character, regardless of its UTF-8 encoding
+        // This ensures we don't get stuck on multi-byte characters
+        pos++;
+        column++;
     }
     
     std::string value = source.substr(start, pos - start);
@@ -684,13 +733,24 @@ Token Lexer::parseMultiLineComment() {
         if (source[pos] == '*' && source[pos + 1] == '|') {
             break;
         }
-        advance();
+        // Directly advance pos and column to handle UTF-8 characters properly
+        if (source[pos] == '\n') {
+            line++;
+            column = 1;
+        } else {
+            column++;
+        }
+        pos++;
     }
     
     // Consume closing *|
     if (pos + 1 < source.length()) {
-        advance(); // Consume *
-        advance(); // Consume |
+        // Consume *
+        column++;
+        pos++;
+        // Consume |
+        column++;
+        pos++;
     }
     
     std::string value = source.substr(start, pos - start - 2); // -2 to exclude the closing *|
@@ -710,21 +770,36 @@ Token Lexer::parseDocComment() {
     int start_line = line;
     int start_column = column;
     
-    // Skip comment until closing /|
+    // Skip comment until closing /| (correct end delimiter)
     while (pos + 1 < source.length()) {
         if (source[pos] == '/' && source[pos + 1] == '|') {
             break;
         }
-        advance();
+        // Handle newline for proper line counting
+        if (source[pos] == '\n') {
+            line++;
+            column = 1;
+        } else {
+            column++;
+        }
+        pos++;
     }
     
-    // Consume closing /|
+    // Extract comment content
+    std::string value;
+    if (pos > start) {
+        value = source.substr(start, pos - start);
+    }
+    
+    // Consume closing delimiter /|
     if (pos + 1 < source.length()) {
-        advance(); // Consume /
-        advance(); // Consume |
+        // Consume /
+        column++;
+        pos++;
+        // Consume |
+        column++;
+        pos++;
     }
-    
-    std::string value = source.substr(start, pos - start - 2); // -2 to exclude the closing /|
     
     Token token;
     token.type = COMMENT;

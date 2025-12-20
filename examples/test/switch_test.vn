@@ -1,0 +1,45 @@
+func main() {
+    || 测试整数switch
+    var num = 2;
+    System.print("Testing integer switch with value: " + num);
+    
+    switch (num) {
+        case 1 {
+            System.print("Case 1 executed");
+        }
+        case 2 {
+            System.print("Case 2 executed");
+        }
+        case 3 {
+            System.print("Case 3 executed");
+        }
+    }
+    
+    || 测试字符串switch
+    var str = "hello";
+    System.print("\nTesting string switch with value: " + str);
+    
+    switch (str) {
+        case "hello" {
+            System.print("Hello case executed");
+        }
+        case "world" {
+            System.print("World case executed");
+        }
+    }
+    
+    || 测试布尔值switch
+    var flag = true;
+    System.print("\nTesting boolean switch with value: " + flag);
+    
+    switch (flag) {
+        case true {
+            System.print("True case executed");
+        }
+        case false {
+            System.print("False case executed");
+        }
+    }
+    
+    return 0;
+}

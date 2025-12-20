@@ -107,6 +107,9 @@ private:
     // Generate range expression
     std::string generateRangeExpression(RangeExpression* range);
     
+    // Generate lambda expression
+    std::string generateLambdaExpression(LambdaExpression* lambda);
+    
     // Generate import statement
     std::string generateImportStatement(ImportStatement* importStmt);
 };

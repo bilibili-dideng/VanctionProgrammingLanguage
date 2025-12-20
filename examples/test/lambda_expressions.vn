@@ -1,0 +1,31 @@
+|| 测试lambda表达式基本功能
+func main() {
+    || 1. 基本lambda表达式赋值给变量
+    var add = lambda (a, b) -> a + b;
+    
+    || 2. 调用lambda表达式
+    System.print(add(1, 3));
+    
+    || 3. 不同参数数量的lambda表达式
+    var square = lambda (x) -> x * x;
+    System.print(square(5));
+    
+    var greet = lambda (name) -> "Hello, " + name;
+    System.print(greet("World"));
+    
+    || 4. 无参数lambda表达式
+    var getPi = lambda () -> 3.14159;
+    System.print(getPi());
+    
+    || 5. 复杂表达式体
+    var complex = lambda (a, b, c) -> (a + b) * c - a / b;
+    System.print(complex(10, 2, 3));
+    
+    || 6. 嵌套lambda表达式
+    var outer = lambda (x) -> lambda (y) -> x + y;
+    var add5 = outer(5);
+    System.print(add5(3));
+    
+    || 7. 立即调用的lambda表达式
+    System.print((lambda (a, b) -> a * b)(4, 5));
+}

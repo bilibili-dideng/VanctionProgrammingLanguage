@@ -58,6 +58,9 @@ private:
     // Parse primary expression
     Expression* parsePrimaryExpression();
     
+    // Parse postfix expression (function calls, etc.)
+    Expression* parsePostfixExpression();
+    
     // Parse string literal
     Expression* parseStringLiteral();
     

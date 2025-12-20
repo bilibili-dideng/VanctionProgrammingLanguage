@@ -1,0 +1,28 @@
+func main() {
+    || 创建哈希表
+    var person = {
+        "name": "Alice",
+        "age": 30,
+        "city": "New York"
+    };
+    
+    || 访问值
+    System.print("Name: " + person["name"]);
+    
+    || 修改值
+    person["age"] = 31;
+    
+    || 添加新的键值对
+    person["email"] = "alice@example.com";
+    
+    || 遍历哈希表
+    for (key, value in person) {
+        System.print(key + ": " + value);
+    }
+    
+    || 获取所有键
+    var keys = person.key();
+    System.print("Keys: " + keys);
+    
+    return 0;
+}

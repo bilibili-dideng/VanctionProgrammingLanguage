@@ -132,7 +132,7 @@ public:
         : Expression(line, column), value(value), type(type) {}
 };
 
-// Function call expression
+// Function call expression (for methods and named functions)
 class FunctionCall : public Expression {
 public:
     std::string objectName;
@@ -143,6 +143,23 @@ public:
         : Expression(line, column), objectName(objectName), methodName(methodName) {}
     
     ~FunctionCall() {
+        for (auto arg : arguments) {
+            delete arg;
+        }
+    }
+};
+
+// Function call expression (for expressions that evaluate to functions, like lambdas)
+class FunctionCallExpression : public Expression {
+public:
+    Expression* callee;
+    std::vector<Expression*> arguments;
+    
+    FunctionCallExpression(Expression* callee, const std::vector<Expression*>& arguments, int line = 1, int column = 1)
+        : Expression(line, column), callee(callee), arguments(arguments) {}
+    
+    ~FunctionCallExpression() {
+        delete callee;
         for (auto arg : arguments) {
             delete arg;
         }
@@ -461,6 +478,26 @@ public:
     
     ErrorObject(const std::string& text, const std::string& type, const std::string& info)
         : text(text), type(type), info(info) {}
+};
+
+// Lambda expression
+class LambdaExpression : public Expression {
+public:
+    std::vector<FunctionParameter> parameters;
+    Expression* body;
+    
+    // For closures: save the variable environment when the lambda is created
+    // We'll use void* to store the actual environment, which will be cast to the appropriate type at runtime
+    void* closureEnv;
+    
+    LambdaExpression(const std::vector<FunctionParameter>& parameters, Expression* body, int line = 1, int column = 1)
+        : Expression(line, column), parameters(parameters), body(body), closureEnv(nullptr) {}
+    
+    ~LambdaExpression() {
+        if (body) {
+            delete body;
+        }
+    }
 };
 
 // Namespace declaration node

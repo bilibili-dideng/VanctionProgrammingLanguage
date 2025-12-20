@@ -537,6 +537,22 @@ std::string CodeGenerator::generateExpression(Expression* expr, bool isLvalue) {
         return generateHashMapLiteral(hashMapLit);
     } else if (auto rangeExpr = dynamic_cast<RangeExpression*>(expr)) {
         return generateRangeExpression(rangeExpr);
+    } else if (auto lambdaExpr = dynamic_cast<LambdaExpression*>(expr)) {
+        return generateLambdaExpression(lambdaExpr);
+    } else if (auto funcCallExpr = dynamic_cast<FunctionCallExpression*>(expr)) {
+        // Generate function call expression, e.g., (lambda (a,b)->a+b)(1,2)
+        std::string code = "(" + generateExpression(funcCallExpr->callee, false) + ")(";
+        
+        // Generate arguments
+        for (size_t i = 0; i < funcCallExpr->arguments.size(); i++) {
+            if (i > 0) {
+                code += ", ";
+            }
+            code += generateExpression(funcCallExpr->arguments[i], false);
+        }
+        
+        code += ")";
+        return code;
     }
     return "// Unimplemented expression";
 }
@@ -746,8 +762,13 @@ std::string CodeGenerator::generateForLoopStatement(ForLoopStatement* stmt) {
     
     // Generate initialization
     if (auto varDecl = dynamic_cast<VariableDeclaration*>(stmt->initialization)) {
-        code += generateVariableDeclaration(varDecl).substr(4); // Remove indentation
-        code.pop_back(); // Remove newline
+        std::string declCode = generateVariableDeclaration(varDecl).substr(4); // Remove indentation
+        declCode.pop_back(); // Remove newline
+        // Remove semicolon at the end of declaration
+        if (!declCode.empty() && declCode.back() == ';') {
+            declCode.pop_back();
+        }
+        code += declCode;
     } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(stmt->initialization)) {
         code += generateExpression(exprStmt->expression, false);
     }
@@ -873,14 +894,37 @@ std::string CodeGenerator::generateCaseStatement(CaseStatement* stmt) {
 // Generate switch statement
 std::string CodeGenerator::generateSwitchStatement(SwitchStatement* stmt) {
     std::string code;
-    code += "    switch (" + generateExpression(stmt->expression, false) + ") {\n";
+    std::string switchExpr = generateExpression(stmt->expression, false);
     
-    // Generate case statements
-    for (auto caseStmt : stmt->cases) {
-        code += generateCaseStatement(caseStmt);
+    // For C++ compatibility, generate if-else if chain instead of switch
+    // This allows support for strings and other non-integer types
+    for (size_t i = 0; i < stmt->cases.size(); ++i) {
+        auto caseStmt = stmt->cases[i];
+        std::string caseExpr = generateExpression(caseStmt->value, false);
+        
+        if (i == 0) {
+            // First case - use if
+            code += "    if (" + switchExpr + " == " + caseExpr + ") {\n";
+        } else {
+            // Subsequent cases - use else if
+            code += "    } else if (" + switchExpr + " == " + caseExpr + ") {\n";
+        }
+        
+        // Generate case body
+        for (auto bodyStmt : caseStmt->body) {
+            if (auto comment = dynamic_cast<Comment*>(bodyStmt)) {
+                code += generateComment(comment);
+            } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(bodyStmt)) {
+                code += generateExpressionStatement(exprStmt);
+            } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(bodyStmt)) {
+                code += generateVariableDeclaration(varDecl);
+            }
+        }
     }
     
+    // Close the last if/else if block
     code += "    }\n";
+    
     return code;
 }
 
@@ -898,10 +942,14 @@ std::string CodeGenerator::generateClassDeclaration(ClassDeclaration* cls) {
     // Generate public section
     code += "public:\n";
     
-    // Add member variables (name, age, and id are common in examples)
-    code += "    std::string name;\n";
-    code += "    int age;\n";
-    code += "    int id;\n\n";
+    // Only add member variables if this is the base class
+    // For derived classes, inherit from base class instead of redefining variables
+    if (cls->baseClassName.empty()) {
+        // Add member variables (name, age, and id are common in examples)
+        code += "    std::string name;\n";
+        code += "    int age;\n";
+        code += "    int id;\n\n";
+    }
     
     // Generate init method as constructor
     if (auto initMethod = dynamic_cast<InstanceMethodDeclaration*>(cls->initMethod)) {
@@ -966,8 +1014,9 @@ std::string CodeGenerator::generateClassDeclaration(ClassDeclaration* cls) {
                         // Replace instance. with this->
                         stmtCode.replace(pos, 9, "this->");
                         
-                        // Check if we need to fix Id to id
+                        // Check if we need to fix Id to id for instance access
                         if (pos + 10 <= stmtCode.length() && stmtCode.substr(pos + 6, 2) == "Id") {
+                            // Replace instance.Id with this->id
                             stmtCode.replace(pos + 6, 2, "id");
                         }
                         
@@ -982,11 +1031,22 @@ std::string CodeGenerator::generateClassDeclaration(ClassDeclaration* cls) {
                     }
                 }
                 
-                // Also fix any direct Id assignments to id
+                // Handle Id parameter correctly in constructor body
                 pos = 0;
                 while ((pos = stmtCode.find("Id", pos)) != std::string::npos) {
-                    // Check if this is a standalone Id or part of a larger identifier
-                    if ((pos == 0 || !isalnum(stmtCode[pos - 1])) && 
+                    // Check if this Id is on the right side of an assignment
+                    size_t assignPos = stmtCode.rfind("=", pos);
+                    size_t semicolonPos = stmtCode.find(";", pos);
+                    
+                    // If it's after an assignment operator and before a semicolon,
+                    // it's likely a parameter reference, so don't replace it
+                    bool isParameterReference = (assignPos != std::string::npos) && 
+                                               (semicolonPos == std::string::npos || pos < semicolonPos) &&
+                                               (pos - assignPos > 1);
+                    
+                    // Only replace if it's not a parameter reference and is a standalone Id
+                    if (!isParameterReference && 
+                        (pos == 0 || !isalnum(stmtCode[pos - 1])) && 
                         (pos + 2 >= stmtCode.length() || !isalnum(stmtCode[pos + 2]))) {
                         stmtCode.replace(pos, 2, "id");
                         pos += 2;
@@ -1038,7 +1098,8 @@ std::string CodeGenerator::generateClassMethodDeclaration(ClassMethodDeclaration
             } else if (param.name == "age" || param.name == "id") {
                 paramType = "int";
             } else {
-                paramType = "auto";
+                // Use std::variant for generic parameters instead of auto to avoid C++20 warning
+                paramType = "std::variant<int, std::string, bool>";
             }
             code += paramType + " " + param.name;
             if (i < method->parameters.size() - 1) {
@@ -1157,7 +1218,8 @@ std::string CodeGenerator::generateInstanceMethodDeclaration(InstanceMethodDecla
         } else if (param.name == "age" || param.name == "id") {
             paramType = "int";
         } else {
-            paramType = "auto";
+            // Use std::variant for generic parameters instead of auto to avoid C++20 warning
+            paramType = "std::variant<int, std::string, bool>";
         }
         code += paramType + " " + param.name;
         if (i < method->parameters.size() - 1) {
@@ -1488,7 +1550,32 @@ std::string CodeGenerator::generateFunctionCall(FunctionCall* call) {
 
 // Generate comment
 std::string CodeGenerator::generateComment(Comment* comment) {
-    return "    // " + comment->text.substr(1) + "\n"; // Remove | symbol
+    std::string text = comment->text;
+    std::string code;
+    
+    // Handle different comment types
+    if (text.substr(0, 2) == "|*") {
+        // Multi-line comment |* ... *|
+        // Extract content between |* and *|
+        size_t endPos = text.find("*|", 2);
+        if (endPos != std::string::npos) {
+            std::string content = text.substr(2, endPos - 2);
+            code += "    /*" + content + "*/\n";
+        }
+    } else if (text.substr(0, 2) == "|/") {
+        // Doc comment |/ ... /|
+        // Extract content between |/ and /|
+        size_t endPos = text.find("/|", 2);
+        if (endPos != std::string::npos) {
+            std::string content = text.substr(2, endPos - 2);
+            code += "    /**" + content + "*/\n";
+        }
+    } else if (text.substr(0, 1) == "|") {
+        // Single-line comment | ...
+        code += "    // " + text.substr(1) + "\n";
+    }
+    
+    return code;
 }
 
 // Generate list literal expression
@@ -1539,6 +1626,24 @@ std::string CodeGenerator::generateRangeExpression(RangeExpression* range) {
     // Generate a C++ range-based for loop compatible range
     // We'll use a custom generator function for range
     return "vanction::range(" + start + ", " + end + ", " + step + ")";
+}
+
+// Generate lambda expression
+std::string CodeGenerator::generateLambdaExpression(LambdaExpression* lambda) {
+    std::string code = "[](";
+    
+    // Generate parameters
+    for (size_t i = 0; i < lambda->parameters.size(); ++i) {
+        if (i > 0) {
+            code += ", ";
+        }
+        // Since we don't have parameter types, use auto for all parameters
+        code += "auto " + lambda->parameters[i].name;
+    }
+    
+    code += ") -> auto { return " + generateExpression(lambda->body, false) + "; }";
+    
+    return code;
 }
 
 // Generate import statement
