@@ -14,10 +14,12 @@ set(SOURCE_FILES
     src/code_generator.cpp
     src/error.cpp
     src/module_manager.cpp
+        src/main.cpp
 )
 
 # 添加可执行文件
-add_executable(vanction ${SOURCE_FILES})
+add_executable(vanction ${SOURCE_FILES}
+        src/main.cpp)
 
 # 设置输出目录
 set_target_properties(vanction PROPERTIES

@@ -1,0 +1,13 @@
+func main() {
+    || Test basic variable declaration using || comment
+    var a = 10;
+    System.print(a);
+    
+    || Test constant declaration
+    immut var b = 30;
+    System.print(b);
+    
+    
+
+    return 0;
+}

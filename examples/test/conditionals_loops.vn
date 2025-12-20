@@ -1,6 +1,6 @@
 func main() {
-    auto count = 0;
-    auto sum = 0;
+    var count = 0;
+    var sum = 0;
     
     while (count < 5) {
         sum = sum + count;

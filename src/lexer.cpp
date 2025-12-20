@@ -36,21 +36,24 @@ Token Lexer::getNextToken() {
         std::cout << "[DEBUG] Lexer: Processing character '" << current << "' at line " << line << ", column " << column << std::endl;
     }
     
-    // Check for comment (using || or //)
-    if ((current == '|' && pos + 1 < source.length() && source[pos + 1] == '|') ||
-        (current == '/' && pos + 1 < source.length() && source[pos + 1] == '/')) {
-        if (current == '|') {
-            advance(); // Consume first |
-            advance(); // Consume second |
-        } else {
-            advance(); // Consume first /
-            advance(); // Consume second /
-        }
-        Token token = parseComment();
-        if (debugMode) {
-            std::cout << "[DEBUG] Lexer: COMMENT token: " << token.value << " at line " << token.line << ", column " << token.column << std::endl;
-        }
-        return token;
+    // Check for comment types
+    // Multi-line comment: |* ... *|
+    if (current == '|' && pos + 1 < source.length() && source[pos + 1] == '*') {
+        advance(); // Consume |
+        advance(); // Consume *
+        return parseMultiLineComment();
+    }
+    // Doc comment: |\ ... /|
+    else if (current == '|' && pos + 1 < source.length() && source[pos + 1] == '\\') {
+        advance(); // Consume |
+        advance(); // Consume \
+        return parseDocComment();
+    }
+    // Single-line comment: || ...
+    else if (current == '|' && pos + 1 < source.length() && source[pos + 1] == '|') {
+        advance(); // Consume first |
+        advance(); // Consume second |
+        return parseComment();
     }
     
     // Check for string literal (with optional r or f prefix)
@@ -477,7 +480,7 @@ Token Lexer::getNextToken() {
     }
     
     // Check for number literal (integer, float, or double)
-    if (isdigit(current)) {
+    if (isdigit(current) || (current == '-' && pos + 1 < source.length() && isdigit(source[pos + 1]))) {
         return parseNumberLiteral();
     }
     
@@ -534,6 +537,8 @@ Token Lexer::parseIdentifierOrKeyword() {
     if (value == "func" || value == "int" || value == "char" || value == "string" || 
         value == "bool" || value == "auto" || value == "define" || value == "true" || value == "false" ||
         value == "float" || value == "double" || value == "List" || value == "HashMap" ||
+        // Variable declaration keywords
+        value == "var" || value == "immut" ||
         // Control flow keywords
         value == "if" || value == "else" || value == "else-if" || value == "for" || value == "while" || value == "do" ||
         value == "switch" || value == "case" || value == "in" || value == "return" || value == "namespace" ||
@@ -593,6 +598,13 @@ Token Lexer::parseNumberLiteral() {
     int start_line = line;
     int start_column = column;
     bool hasDecimal = false;
+    bool isNegative = false;
+    
+    // Check for negative sign
+    if (source[pos] == '-') {
+        isNegative = true;
+        advance();
+    }
     
     // Parse digits before decimal point
     while (pos < source.length() && isdigit(source[pos])) {
@@ -639,7 +651,7 @@ Token Lexer::parseNumberLiteral() {
     return token;
 }
 
-// Parse comment
+// Parse single-line comment
 Token Lexer::parseComment() {
     size_t start = pos;
     int start_line = line;
@@ -661,11 +673,106 @@ Token Lexer::parseComment() {
     return token;
 }
 
+// Parse multi-line comment |* ... *|
+Token Lexer::parseMultiLineComment() {
+    size_t start = pos;
+    int start_line = line;
+    int start_column = column;
+    
+    // Skip comment until closing *|
+    while (pos + 1 < source.length()) {
+        if (source[pos] == '*' && source[pos + 1] == '|') {
+            break;
+        }
+        advance();
+    }
+    
+    // Consume closing *|
+    if (pos + 1 < source.length()) {
+        advance(); // Consume *
+        advance(); // Consume |
+    }
+    
+    std::string value = source.substr(start, pos - start - 2); // -2 to exclude the closing *|
+    
+    Token token;
+    token.type = COMMENT;
+    token.value = value;
+    token.line = start_line;
+    token.column = start_column;
+    
+    return token;
+}
+
+// Parse doc comment |\ ... /|
+Token Lexer::parseDocComment() {
+    size_t start = pos;
+    int start_line = line;
+    int start_column = column;
+    
+    // Skip comment until closing /|
+    while (pos + 1 < source.length()) {
+        if (source[pos] == '/' && source[pos + 1] == '|') {
+            break;
+        }
+        advance();
+    }
+    
+    // Consume closing /|
+    if (pos + 1 < source.length()) {
+        advance(); // Consume /
+        advance(); // Consume |
+    }
+    
+    std::string value = source.substr(start, pos - start - 2); // -2 to exclude the closing /|
+    
+    Token token;
+    token.type = COMMENT;
+    token.value = value;
+    token.line = start_line;
+    token.column = start_column;
+    
+    return token;
+}
+
 // Parse string literal
 Token Lexer::parseStringLiteral() {
     size_t start = pos;
     int start_line = line;
     int start_column = column;
+    
+    // Check for Python-style multi-line comment: """
+    if (pos + 2 < source.length() && source[pos] == '"' && source[pos + 1] == '"' && source[pos + 2] == '"') {
+        // This is a multi-line comment, not a string literal
+        advance(); // Consume first "
+        advance(); // Consume second "
+        advance(); // Consume third "
+        
+        // Skip comment until closing """
+        while (pos + 2 < source.length()) {
+            if (source[pos] == '"' && source[pos + 1] == '"' && source[pos + 2] == '"') {
+                break;
+            }
+            advance();
+        }
+        
+        // Consume closing """
+        if (pos + 2 < source.length()) {
+            advance(); // Consume first "
+            advance(); // Consume second "
+            advance(); // Consume third "
+        }
+        
+        std::string value = source.substr(start + 3, pos - start - 6); // +3 to skip opening """, -6 to exclude both opening and closing
+        
+        Token token;
+        token.type = COMMENT;
+        token.value = value;
+        token.line = start_line;
+        token.column = start_column;
+        
+        return token;
+    }
     
     // Check for string prefix (r or f)
     std::string prefix;

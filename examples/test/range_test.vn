@@ -1,5 +1,0 @@
-func main() {
-    for(i in range(1, 10000000)) {
-        System.print(i);
-    }
-}

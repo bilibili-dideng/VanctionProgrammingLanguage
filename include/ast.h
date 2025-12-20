@@ -157,9 +157,10 @@ public:
     Expression* initializer;
     bool isAuto;
     bool isDefine;
+    bool isImmut;
     
-    VariableDeclaration(const std::string& type, const std::string& name, Expression* initializer = nullptr, bool isAuto = false, bool isDefine = false)
-        : type(type), name(name), initializer(initializer), isAuto(isAuto), isDefine(isDefine) {}
+    VariableDeclaration(const std::string& type, const std::string& name, Expression* initializer = nullptr, bool isAuto = false, bool isDefine = false, bool isImmut = false)
+        : type(type), name(name), initializer(initializer), isAuto(isAuto), isDefine(isDefine), isImmut(isImmut) {}
     
     ~VariableDeclaration() {
         if (initializer) {

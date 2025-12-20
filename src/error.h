@@ -8,6 +8,7 @@
 // Error type enumeration
 enum class ErrorType {
     CError,
+    VariableError,
     MethodError,
     CompilationError,
     DivideByZeroError,
@@ -19,6 +20,7 @@ enum class ErrorType {
     HashMapKeyError,
     TypeError,
     RangeError,
+    ImmutError,
     UnknownError
 };
 
@@ -49,6 +51,12 @@ namespace vanction_error {
     public:
         explicit CError(const std::string& message, int line = 1, int column = 1)
             : VanctionError("CError", message, line, column) {}
+    };
+
+    class VariableError : public VanctionError {
+    public:
+        explicit VariableError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("VariableError", message, line, column) {}
     };
     
     class MethodError : public VanctionError {
@@ -122,6 +130,12 @@ namespace vanction_error {
     public:
         explicit RangeError(const std::string& message, int line = 1, int column = 1)
             : VanctionError("RangeError", message, line, column) {}
+    };
+    
+    class ImmutError : public VanctionError {
+    public:
+        explicit ImmutError(const std::string& message, int line = 1, int column = 1)
+            : VanctionError("ImmutError", message, line, column) {}
     };
 }
 

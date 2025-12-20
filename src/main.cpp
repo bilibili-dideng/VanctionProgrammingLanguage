@@ -11,7 +11,9 @@
 #include <variant>
 #include <any>
 #include <stdexcept>
+#ifdef _WIN32
 #include <windows.h>
+#endif
 
 // Forward declaration for getExecutableDir function
 std::string getExecutableDir();
@@ -79,6 +81,7 @@ int compileWithGCC(const std::string& cppFile, const std::string& outputFile) {
 
 // Get executable directory path
 std::string getExecutableDir() {
+#ifdef _WIN32
     char buffer[1024];
     GetModuleFileNameA(NULL, buffer, sizeof(buffer));
     std::string path(buffer);
@@ -87,6 +90,20 @@ std::string getExecutableDir() {
         lastSlash = path.find_last_of('/');
     }
     return lastSlash != std::string::npos ? path.substr(0, lastSlash) : "";
+#else
+    // For non-Windows systems, use /proc/self/exe on Linux or other platform-specific methods
+    // This is a simple fallback that should work on most Unix-like systems
+    char buffer[1024];
+    ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
+    if (len != -1) {
+        buffer[len] = '\0';
+        std::string path(buffer);
+        size_t lastSlash = path.find_last_of('/');
+        return lastSlash != std::string::npos ? path.substr(0, lastSlash) : "";
+    }
+    // Fallback to current directory if readlink fails
+    return ".";
+#endif
 }
 
 // Get AppData directory for configuration storage
@@ -132,10 +149,14 @@ std::string getFileNameWithoutExt(const std::string& filePath) {
     return filePath.substr(0, dotPos);
 }
 
-// Type for variable values - extended to include Instance* for objects
+// Forward declarations for data structures
+class List;
+class HashMap;
+
+// Type for variable values - extended to include data structures and Instance* for objects
 // Forward declaration for Instance type
 class Instance;
-using Value = std::variant<int, char, std::string, bool, float, double, std::monostate, Instance*, ErrorObject*>;
+using Value = std::variant<int, char, std::string, bool, float, double, std::monostate, Instance*, ErrorObject*, List*, HashMap*>;
 
 // Class definition structure
 struct ClassDefinition {
@@ -144,6 +165,85 @@ struct ClassDefinition {
     std::vector<InstanceMethodDeclaration*> instanceMethods;
     std::vector<ClassMethodDeclaration*> classMethods;
     InstanceMethodDeclaration* initMethod;
+};
+
+// List data structure implementation
+class List {
+public:
+    List() {}
+    
+    std::vector<Value> elements;
+    
+    // Add element to list
+    void add(Value element) {
+        elements.push_back(element);
+    }
+    
+    // Get element by index (supports negative indices)
+    Value get(int index) {
+        if (index < 0) {
+            index = elements.size() + index;
+        }
+        if (index < 0 || index >= elements.size()) {
+                throw vanction_error::ListIndexError("List index out of range", 0, 0);
+            }
+        return elements[index];
+    }
+    
+    // Set element by index (supports negative indices)
+    void set(int index, Value element) {
+        if (index < 0) {
+            index = elements.size() + index;
+        }
+        if (index < 0 || index >= elements.size()) {
+                throw vanction_error::ListIndexError("List index out of range", 0, 0);
+            }
+        elements[index] = element;
+    }
+    
+    // Get list size
+    int size() {
+        return elements.size();
+    }
+};
+
+// HashMap data structure implementation
+class HashMap {
+public:
+    HashMap() {}
+    
+    std::map<std::string, Value> entries;
+    
+    // Get value by key with default support
+    Value get(const std::string& key, Value defaultValue = std::monostate{}) {
+        if (entries.find(key) != entries.end()) {
+            return entries[key];
+        }
+        return defaultValue;
+    }
+    
+    // Set value by key
+    void set(const std::string& key, Value value) {
+        entries[key] = value;
+    }
+    
+    // Get all keys as List
+    List* keys() {
+        List* keyList = new List();
+        for (auto& entry : entries) {
+            keyList->add(std::string(entry.first));
+        }
+        return keyList;
+    }
+    
+    // Get all values as List
+    List* values() {
+        List* valueList = new List();
+        for (auto& entry : entries) {
+            valueList->add(entry.second);
+        }
+        return valueList;
+    }
 };
 
 // Instance structure
@@ -157,9 +257,21 @@ public:
 
 // Global environments
 std::map<std::string, Value> variables;
+std::map<std::string, Value> constants; // Store constants (immut variables)
+std::map<std::string, std::string> variableTypes; // Store variable types
 std::map<std::string, FunctionDeclaration*> functions;
 std::map<std::string, std::map<std::string, FunctionDeclaration*>> namespaces;
 std::map<std::string, ClassDefinition*> classes; // Store class definitions
+
+// Initialize global constants
+void initializeConstants() {
+    // Boolean constants
+    constants["true"] = true;
+    constants["false"] = false;
+    variableTypes["true"] = "bool";
+    variableTypes["false"] = "bool";
+}
+
 
 // Forward declarations for execute functions
 Value executeFunctionDeclaration(FunctionDeclaration* func);
@@ -378,10 +490,41 @@ Value executeStatement(ASTNode* stmt, bool* shouldReturn) {
         if (varDecl->initializer) {
             // Execute initializer and store value
             Value value = executeExpression(varDecl->initializer);
-            variables[varDecl->name] = value;
+            
+            // Determine variable type
+            std::string varType;
+            if (std::holds_alternative<int>(value)) {
+                varType = "int";
+            } else if (std::holds_alternative<char>(value)) {
+                varType = "char";
+            } else if (std::holds_alternative<std::string>(value)) {
+                varType = "string";
+            } else if (std::holds_alternative<bool>(value)) {
+                varType = "bool";
+            } else if (std::holds_alternative<float>(value)) {
+                varType = "float";
+            } else if (std::holds_alternative<double>(value)) {
+                varType = "double";
+            } else if (std::holds_alternative<Instance*>(value)) {
+                varType = "instance";
+            } else {
+                varType = "unknown";
+            }
+            
+            // Store variable type
+            variableTypes[varDecl->name] = varType;
+            
+            if (varDecl->isImmut) {
+                // Store in constants map for immut variables
+                constants[varDecl->name] = value;
+            } else {
+                // Store in variables map for regular variables
+                variables[varDecl->name] = value;
+            }
         } else {
             // Store default value (monostate for undefined)
             variables[varDecl->name] = std::monostate{};
+            variableTypes[varDecl->name] = "unknown";
         }
         return std::monostate{};
     } else if (auto ifStmt = dynamic_cast<IfStatement*>(stmt)) {
@@ -691,7 +834,53 @@ Value executeExpression(Expression* expr) {
         // Handle assignment based on left expression type
         if (auto ident = dynamic_cast<Identifier*>(assignExpr->left)) {
             // Simple variable assignment
-            variables[ident->name] = value;
+            std::string varName = ident->name;
+            
+            // Check if variable is a constant (immut var)
+            if (constants.find(varName) != constants.end()) {
+                throw vanction_error::ImmutError("Cannot assign to constant '" + varName + "'");
+            }
+            
+            // Check if variable exists
+            if (variables.find(varName) == variables.end()) {
+                throw vanction_error::MethodError("Variable '" + varName + "' not declared");
+            }
+            
+            // Check type compatibility
+            if (variableTypes.find(varName) != variableTypes.end()) {
+                std::string existingType = variableTypes[varName];
+                std::string newValueType;
+                
+                if (std::holds_alternative<int>(value)) {
+                    newValueType = "int";
+                } else if (std::holds_alternative<char>(value)) {
+                    newValueType = "char";
+                } else if (std::holds_alternative<std::string>(value)) {
+                    newValueType = "string";
+                } else if (std::holds_alternative<bool>(value)) {
+                    newValueType = "bool";
+                } else if (std::holds_alternative<float>(value)) {
+                    newValueType = "float";
+                } else if (std::holds_alternative<double>(value)) {
+                    newValueType = "double";
+                } else if (std::holds_alternative<List*>(value)) {
+                    newValueType = "list";
+                } else if (std::holds_alternative<HashMap*>(value)) {
+                    newValueType = "hashmap";
+                } else if (std::holds_alternative<Instance*>(value)) {
+                    newValueType = "instance";
+                } else {
+                    newValueType = "unknown";
+                }
+                
+                // Check if types are compatible
+                if (existingType != "unknown" && newValueType != "unknown" && existingType != newValueType) {
+                    throw vanction_error::MethodError("Type mismatch: cannot assign '" + newValueType + "' to variable of type '" + existingType + "'");
+                }
+            }
+            
+            // Update variable value
+            variables[varName] = value;
         } else if (auto instanceAccess = dynamic_cast<InstanceAccessExpression*>(assignExpr->left)) {
             // Instance variable assignment
             Value instanceVal = executeExpression(instanceAccess->instance);
@@ -706,27 +895,100 @@ Value executeExpression(Expression* expr) {
             // Assign value to instance variable
             instance->instanceVariables[memberName] = value;
         } else if (auto binaryExpr = dynamic_cast<BinaryExpression*>(assignExpr->left)) {
+            // Handle index assignment: obj[index] = value
+            if (binaryExpr->op == "[") {
+                // Execute the left side (object being indexed)
+                Value leftObj = executeExpression(binaryExpr->left);
+                // Execute the index expression
+                Value indexExpr = executeExpression(binaryExpr->right);
+                
+                // Handle List index assignment
+                if (std::holds_alternative<List*>(leftObj)) {
+                    List* list = std::get<List*>(leftObj);
+                    
+                    // Convert index to integer
+                    int index;
+                    if (std::holds_alternative<int>(indexExpr)) {
+                        index = std::get<int>(indexExpr);
+                    } else {
+                        throw vanction_error::TypeError("List index must be an integer");
+                    }
+                    
+                    // Handle negative indices
+                    if (index < 0) {
+                        index = list->elements.size() + index;
+                    }
+                    
+                    // Check bounds
+                    if (index < 0 || index >= list->elements.size()) {
+                        throw vanction_error::RangeError("List index out of range", 0, 0);
+                    }
+                    
+                    // Assign value to list index
+                    list->set(index, value);
+                }
+                // Handle HashMap index assignment
+                else if (std::holds_alternative<HashMap*>(leftObj)) {
+                    HashMap* map = std::get<HashMap*>(leftObj);
+                    
+                    // Convert key to string
+                    std::string key;
+                    if (std::holds_alternative<std::string>(indexExpr)) {
+                        key = std::get<std::string>(indexExpr);
+                    } else {
+                        // Convert other types to string
+                        auto toString = [](Value val) -> std::string {
+                            if (std::holds_alternative<int>(val)) {
+                                return std::to_string(std::get<int>(val));
+                            } else if (std::holds_alternative<float>(val)) {
+                                return std::to_string(std::get<float>(val));
+                            } else if (std::holds_alternative<double>(val)) {
+                                return std::to_string(std::get<double>(val));
+                            } else if (std::holds_alternative<bool>(val)) {
+                                return std::get<bool>(val) ? "true" : "false";
+                            } else if (std::holds_alternative<char>(val)) {
+                                return std::string(1, std::get<char>(val));
+                            } else {
+                                throw vanction_error::TypeError("HashMap key must be a string or convertible to string");
+                            }
+                        };
+                        key = toString(indexExpr);
+                    }
+                    
+                    // Assign value to HashMap key
+                    map->set(key, value);
+                }
+                // Handle string index assignment (immutable strings)
+                else if (std::holds_alternative<std::string>(leftObj)) {
+                    throw vanction_error::TypeError("Strings are immutable, cannot assign to index");
+                }
+                else {
+                    throw vanction_error::TypeError("Index assignment not supported for this type");
+                }
+            }
             // This handles instance.xxx = yyy assignments
             // Check if left side is an Identifier with value "instance"
-            if (auto leftIdent = dynamic_cast<Identifier*>(binaryExpr->left)) {
-                if (leftIdent->name == "instance" && binaryExpr->op == ".") {
-                    // This is an instance property assignment: instance.property = value
-                    if (auto rightIdent = dynamic_cast<Identifier*>(binaryExpr->right)) {
-                        std::string propertyName = rightIdent->name;
-                        
-                        // Get the instance from the variables environment
-                        if (variables.find("instance") == variables.end()) {
-                            throw vanction_error::MethodError("Instance variable not found in current context");
+            else if (binaryExpr->op == ".") {
+                if (auto leftIdent = dynamic_cast<Identifier*>(binaryExpr->left)) {
+                    if (leftIdent->name == "instance") {
+                        // This is an instance property assignment: instance.property = value
+                        if (auto rightIdent = dynamic_cast<Identifier*>(binaryExpr->right)) {
+                            std::string propertyName = rightIdent->name;
+                            
+                            // Get the instance from the variables environment
+                            if (variables.find("instance") == variables.end()) {
+                                throw vanction_error::MethodError("Instance variable not found in current context");
+                            }
+                            
+                            Value instanceVal = variables["instance"];
+                            if (!std::holds_alternative<Instance*>(instanceVal)) {
+                                throw vanction_error::MethodError("instance variable is not an Instance*");
+                            }
+                            
+                            Instance* instance = std::get<Instance*>(instanceVal);
+                            // Assign value to instance variable
+                            instance->instanceVariables[propertyName] = value;
                         }
-                        
-                        Value instanceVal = variables["instance"];
-                        if (!std::holds_alternative<Instance*>(instanceVal)) {
-                            throw vanction_error::MethodError("instance variable is not an Instance*");
-                        }
-                        
-                        Instance* instance = std::get<Instance*>(instanceVal);
-                        // Assign value to instance variable
-                        instance->instanceVariables[propertyName] = value;
                     }
                 }
             }
@@ -736,6 +998,80 @@ Value executeExpression(Expression* expr) {
         // Execute binary expression
         auto leftVal = executeExpression(binaryExpr->left);
         auto rightVal = executeExpression(binaryExpr->right);
+        
+        // Handle array indexing: obj[expr]
+        if (binaryExpr->op == "[") {
+            // Handle string indexing
+            if (std::holds_alternative<std::string>(leftVal)) {
+                std::string str = std::get<std::string>(leftVal);
+                
+                // Convert index to integer
+                int index;
+                if (std::holds_alternative<int>(rightVal)) {
+                    index = std::get<int>(rightVal);
+                } else {
+                    throw vanction_error::TypeError("String index must be an integer");
+                }
+                
+                // Handle negative indices
+                if (index < 0) {
+                    index = str.length() + index;
+                }
+                
+                // Check bounds
+                if (index < 0 || index >= str.length()) {
+                    throw vanction_error::RangeError("String index out of range", 0, 0);
+                }
+                
+                return str[index];
+            }
+            // Handle List indexing
+            else if (std::holds_alternative<List*>(leftVal)) {
+                List* list = std::get<List*>(leftVal);
+                
+                // Convert index to integer
+                int index;
+                if (std::holds_alternative<int>(rightVal)) {
+                    index = std::get<int>(rightVal);
+                } else {
+                    throw vanction_error::TypeError("List index must be an integer");
+                }
+                
+                return list->get(index);
+            }
+            // Handle HashMap indexing
+            else if (std::holds_alternative<HashMap*>(leftVal)) {
+                HashMap* map = std::get<HashMap*>(leftVal);
+                
+                // Convert key to string
+                std::string key;
+                if (std::holds_alternative<std::string>(rightVal)) {
+                    key = std::get<std::string>(rightVal);
+                } else {
+                    // Convert other types to string
+                    auto toString = [](Value val) -> std::string {
+                        if (std::holds_alternative<int>(val)) {
+                            return std::to_string(std::get<int>(val));
+                        } else if (std::holds_alternative<float>(val)) {
+                            return std::to_string(std::get<float>(val));
+                        } else if (std::holds_alternative<double>(val)) {
+                            return std::to_string(std::get<double>(val));
+                        } else if (std::holds_alternative<bool>(val)) {
+                            return std::get<bool>(val) ? "true" : "false";
+                        } else if (std::holds_alternative<char>(val)) {
+                            return std::string(1, std::get<char>(val));
+                        } else {
+                            throw vanction_error::TypeError("HashMap key must be a string or convertible to string");
+                        }
+                    };
+                    key = toString(rightVal);
+                }
+                
+                return map->get(key);
+            }
+            
+            throw vanction_error::TypeError("Indexing not supported for this type");
+        }
         
         // Handle string operations, including mixed type concatenation
         if (binaryExpr->op == "+") {
@@ -1071,6 +1407,10 @@ Value executeExpression(Expression* expr) {
                         std::cout << "bool=" << (std::get<bool>(result) ? "true" : "false");
                     } else if (std::holds_alternative<Instance*>(result)) {
                         std::cout << "instance";
+                    } else if (std::holds_alternative<List*>(result)) {
+                        std::cout << "list";
+                    } else if (std::holds_alternative<HashMap*>(result)) {
+                        std::cout << "hashmap";
                     } else if (std::holds_alternative<std::monostate>(result)) {
                         std::cout << "undefined";
                     } else if (std::holds_alternative<ErrorObject*>(result)) {
@@ -1112,11 +1452,15 @@ Value executeExpression(Expression* expr) {
         }
     } else if (auto ident = dynamic_cast<Identifier*>(expr)) {
         // Get variable value
-        if (variables.find(ident->name) != variables.end()) {
+        // First check constants map
+        if (constants.find(ident->name) != constants.end()) {
+            return constants[ident->name];
+        }
+        // Then check variables map
+        else if (variables.find(ident->name) != variables.end()) {
             return variables[ident->name];
         } else {
-            std::cerr << "Error: Undefined variable '" << ident->name << "'" << std::endl;
-            exit(1);
+            throw vanction_error::VariableError("Undefined variable '" + ident->name + "'", ident->getLine(), ident->getColumn());
         }
     } else if (auto intLit = dynamic_cast<IntegerLiteral*>(expr)) {
         // Integer literal
@@ -1193,6 +1537,48 @@ Value executeExpression(Expression* expr) {
     } else if (auto errorObj = dynamic_cast<ErrorObject*>(expr)) {
         // Error object - return itself as a value
         return errorObj;
+    } else if (auto listLit = dynamic_cast<ListLiteral*>(expr)) {
+        // List literal - create a List object and populate it with elements
+        List* list = new List();
+        for (auto elemExpr : listLit->elements) {
+            Value elemValue = executeExpression(elemExpr);
+            list->add(elemValue);
+        }
+        return list;
+    } else if (auto hashMapLit = dynamic_cast<HashMapLiteral*>(expr)) {
+        // HashMap literal - create a HashMap object and populate it with entries
+        HashMap* map = new HashMap();
+        for (auto entry : hashMapLit->entries) {
+            Value keyValue = executeExpression(entry->key);
+            Value valueValue = executeExpression(entry->value);
+            
+            // Convert key to string
+            std::string key;
+            if (std::holds_alternative<std::string>(keyValue)) {
+                key = std::get<std::string>(keyValue);
+            } else {
+                // Convert other types to string
+                auto toString = [](Value val) -> std::string {
+                    if (std::holds_alternative<int>(val)) {
+                        return std::to_string(std::get<int>(val));
+                    } else if (std::holds_alternative<float>(val)) {
+                        return std::to_string(std::get<float>(val));
+                    } else if (std::holds_alternative<double>(val)) {
+                        return std::to_string(std::get<double>(val));
+                    } else if (std::holds_alternative<bool>(val)) {
+                        return std::get<bool>(val) ? "true" : "false";
+                    } else if (std::holds_alternative<char>(val)) {
+                        return std::string(1, std::get<char>(val));
+                    } else {
+                        return "";
+                    }
+                };
+                key = toString(keyValue);
+            }
+            
+            map->set(key, valueValue);
+        }
+        return map;
     }
     
     // Default return value
@@ -1208,8 +1594,8 @@ Value executeFunctionCall(FunctionCall* call) {
         }
         std::cout << call->methodName << "(" << call->arguments.size() << " arguments)" << std::endl;
     }
-    if (call->objectName == "System" && call->methodName == "print") {
-        // Handle System.print
+    if ((call->methodName == "print" && call->objectName.empty()) || (call->objectName == "System" && call->methodName == "print")) {
+        // Handle both print() and System.print()
         for (size_t i = 0; i < call->arguments.size(); ++i) {
             Value value = executeExpression(call->arguments[i]);
             
@@ -1226,6 +1612,66 @@ Value executeFunctionCall(FunctionCall* call) {
                 std::cout << std::get<float>(value);
             } else if (std::holds_alternative<double>(value)) {
                 std::cout << std::get<double>(value);
+            } else if (std::holds_alternative<List*>(value)) {
+                List* list = std::get<List*>(value);
+                std::cout << "[";
+                for (size_t i = 0; i < list->elements.size(); ++i) {
+                    Value elem = list->elements[i];
+                    if (std::holds_alternative<int>(elem)) {
+                        std::cout << std::get<int>(elem);
+                    } else if (std::holds_alternative<char>(elem)) {
+                        std::cout << "'" << std::get<char>(elem) << "'";
+                    } else if (std::holds_alternative<std::string>(elem)) {
+                        std::cout << '"' << std::get<std::string>(elem) << '"';
+                    } else if (std::holds_alternative<bool>(elem)) {
+                        std::cout << (std::get<bool>(elem) ? "true" : "false");
+                    } else if (std::holds_alternative<float>(elem)) {
+                        std::cout << std::get<float>(elem);
+                    } else if (std::holds_alternative<double>(elem)) {
+                        std::cout << std::get<double>(elem);
+                    } else if (std::holds_alternative<List*>(elem)) {
+                        std::cout << "<list>";
+                    } else if (std::holds_alternative<HashMap*>(elem)) {
+                        std::cout << "<hashmap>";
+                    } else {
+                        std::cout << "undefined";
+                    }
+                    if (i < list->elements.size() - 1) {
+                        std::cout << ", ";
+                    }
+                }
+                std::cout << "]";
+            } else if (std::holds_alternative<HashMap*>(value)) {
+                std::cout << "{";
+                HashMap* map = std::get<HashMap*>(value);
+                size_t count = 0;
+                for (auto& entry : map->entries) {
+                    std::cout << entry.first << ": ";
+                    Value val = entry.second;
+                    if (std::holds_alternative<int>(val)) {
+                        std::cout << std::get<int>(val);
+                    } else if (std::holds_alternative<char>(val)) {
+                        std::cout << "'" << std::get<char>(val) << "'";
+                    } else if (std::holds_alternative<std::string>(val)) {
+                        std::cout << '"' << std::get<std::string>(val) << '"';
+                    } else if (std::holds_alternative<bool>(val)) {
+                        std::cout << (std::get<bool>(val) ? "true" : "false");
+                    } else if (std::holds_alternative<float>(val)) {
+                        std::cout << std::get<float>(val);
+                    } else if (std::holds_alternative<double>(val)) {
+                        std::cout << std::get<double>(val);
+                    } else if (std::holds_alternative<List*>(val)) {
+                        std::cout << "<list>";
+                    } else if (std::holds_alternative<HashMap*>(val)) {
+                        std::cout << "<hashmap>";
+                    } else {
+                        std::cout << "undefined";
+                    }
+                    if (++count < map->entries.size()) {
+                        std::cout << ", ";
+                    }
+                }
+                std::cout << "}";
             } else {
                 std::cout << "undefined";
             }
@@ -1441,12 +1887,146 @@ Value executeFunctionCall(FunctionCall* call) {
         } 
         // Check if it's an instance method call (e.g., person1.getName())
         else if (variables.find(call->objectName) != variables.end()) {
-            // Get the instance
-            Value instanceVal = variables[call->objectName];
+            // Get the value
+            Value value = variables[call->objectName];
             
-            if (!std::holds_alternative<Instance*>(instanceVal)) {
+            // Check if it's a List*
+            if (std::holds_alternative<List*>(value)) {
+                List* list = std::get<List*>(value);
+                std::string methodName = call->methodName;
+                
+                // Handle List methods
+                if (methodName == "add") {
+                    // Add element to list
+                    if (call->arguments.size() == 1) {
+                        Value arg = executeExpression(call->arguments[0]);
+                        list->add(arg);
+                        return std::monostate{};
+                    } else {
+                        throw vanction_error::MethodError("List.add() expects exactly 1 argument");
+                    }
+                } else if (methodName == "get") {
+                    // Get element from list
+                    if (call->arguments.size() == 1) {
+                        Value indexArg = executeExpression(call->arguments[0]);
+                        if (std::holds_alternative<int>(indexArg)) {
+                            int index = std::get<int>(indexArg);
+                            return list->get(index);
+                        } else {
+                            throw vanction_error::TypeError("List.get() expects integer index");
+                        }
+                    } else {
+                        throw vanction_error::MethodError("List.get() expects exactly 1 argument");
+                    }
+                } else {
+                    throw vanction_error::MethodError("Undefined method: " + methodName + " on List");
+                }
+            }
+            // Check if it's a HashMap*
+            else if (std::holds_alternative<HashMap*>(value)) {
+                HashMap* map = std::get<HashMap*>(value);
+                std::string methodName = call->methodName;
+                
+                // Handle HashMap methods
+                if (methodName == "get") {
+                    // Get value from HashMap
+                    if (call->arguments.size() == 1 || call->arguments.size() == 2) {
+                        Value keyArg = executeExpression(call->arguments[0]);
+                        if (std::holds_alternative<std::string>(keyArg)) {
+                            std::string key = std::get<std::string>(keyArg);
+                            
+                            if (call->arguments.size() == 2) {
+                                // With default value
+                                Value defaultValue = executeExpression(call->arguments[1]);
+                                return map->get(key, defaultValue);
+                            } else {
+                                // Without default value
+                                return map->get(key);
+                            }
+                        } else {
+                            throw vanction_error::TypeError("HashMap.get() expects string key");
+                        }
+                    } else {
+                        throw vanction_error::MethodError("HashMap.get() expects 1 or 2 arguments");
+                    }
+                } else if (methodName == "keys" || methodName == "key") {
+                    // Get all keys as List* (support both singular and plural)
+                    return map->keys();
+                } else if (methodName == "values" || methodName == "value") {
+                    // Get all values as List* (support both singular and plural)
+                    return map->values();
+                } else {
+                    throw vanction_error::MethodError("Undefined method: " + methodName + " on HashMap");
+                }
+            }
+            // Check if it's a string
+            else if (std::holds_alternative<std::string>(value)) {
+                std::string strVal = std::get<std::string>(value);
+                std::string methodName = call->methodName;
+                
+                // Handle string methods
+                if (methodName == "replace") {
+                    // Replace substring
+                    if (call->arguments.size() == 2) {
+                        Value oldArg = executeExpression(call->arguments[0]);
+                        Value newArg = executeExpression(call->arguments[1]);
+                        
+                        if (std::holds_alternative<std::string>(oldArg) && std::holds_alternative<std::string>(newArg)) {
+                            std::string oldStr = std::get<std::string>(oldArg);
+                            std::string newStr = std::get<std::string>(newArg);
+                            
+                            // Simple string replacement
+                            std::string result = strVal;
+                            size_t pos = 0;
+                            while ((pos = result.find(oldStr, pos)) != std::string::npos) {
+                                result.replace(pos, oldStr.length(), newStr);
+                                pos += newStr.length();
+                            }
+                            return result;
+                        } else {
+                            throw vanction_error::TypeError("String.replace() expects string arguments");
+                        }
+                    } else {
+                        throw vanction_error::MethodError("String.replace() expects exactly 2 arguments");
+                    }
+                } else if (methodName == "excision") {
+                    // Split string by delimiter (excision is like split)
+                    if (call->arguments.size() == 1) {
+                        Value delimArg = executeExpression(call->arguments[0]);
+                        
+                        if (std::holds_alternative<std::string>(delimArg)) {
+                            std::string delim = std::get<std::string>(delimArg);
+                            
+                            List* result = new List();
+                            size_t start = 0;
+                            size_t end = strVal.find(delim);
+                            
+                            while (end != std::string::npos) {
+                                result->add(strVal.substr(start, end - start));
+                                start = end + delim.length();
+                                end = strVal.find(delim, start);
+                            }
+                            
+                            // Add the last part
+                            result->add(strVal.substr(start));
+                            
+                            return result;
+                        } else {
+                            throw vanction_error::TypeError("String.excision() expects string delimiter");
+                        }
+                    } else {
+                        throw vanction_error::MethodError("String.excision() expects exactly 1 argument");
+                    }
+                } else {
+                    throw vanction_error::MethodError("Undefined method: " + methodName + " on String");
+                }
+            }
+            // Check if it's an Instance*
+            else if (!std::holds_alternative<Instance*>(value)) {
                 throw vanction_error::MethodError("Cannot call method on non-instance: " + call->objectName);
             }
+            // Continue with instance method call handling
+            Value instanceVal = value;
             
             Instance* instance = std::get<Instance*>(instanceVal);
             std::string methodName = call->methodName;
@@ -2066,6 +2646,9 @@ int main(int argc, char* argv[]) {
             // Set the directory of the currently executing file
             globalModuleManager->setCurrentExecutingFileDirectory(fileDirectory);
             
+            // Initialize global constants
+            initializeConstants();
+            
             // Execute the program
             Value result = executeProgram(program);
             
@@ -2114,6 +2697,8 @@ int main(int argc, char* argv[]) {
             errorType = ErrorType::SyntaxError;
         } else if (e.getType() == "MainFunctionError") {
             errorType = ErrorType::MainFunctionError;
+        } else if (e.getType() == "ImmutError") {
+            errorType = ErrorType::ImmutError;
         }
         
         // Create and report error

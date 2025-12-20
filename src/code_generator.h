@@ -18,7 +18,7 @@ private:
     std::string generateExpressionStatement(ExpressionStatement* stmt);
     
     // Generate expression
-    std::string generateExpression(Expression* expr);
+    std::string generateExpression(Expression* expr, bool isLvalue = false);
     
     // Generate variable declaration
     std::string generateVariableDeclaration(VariableDeclaration* varDecl);
@@ -45,7 +45,7 @@ private:
     std::string generateDoubleLiteral(DoubleLiteral* literal);
     
     // Generate binary expression
-    std::string generateBinaryExpression(BinaryExpression* expr);
+    std::string generateBinaryExpression(BinaryExpression* expr, bool isLvalue);
     
     // Generate assignment expression
     std::string generateAssignmentExpression(AssignmentExpression* expr);

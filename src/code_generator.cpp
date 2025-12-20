@@ -111,7 +111,153 @@ std::string CodeGenerator::generate(Program* program) {
     std::string code;
     
     // Add header files
-    code += "#include <iostream>\n#include <string>\n#include <memory>\n#include <vector>\n#include <unordered_map>\n#include <variant>\n\n";
+    code += "#include <iostream>\n#include <string>\n#include <memory>\n#include <vector>\n#include <unordered_map>\n#include <variant>\n#include <functional>\n\n";    
+    
+    // Add helper functions for variant handling
+    code += "// Helper functions for variant handling\n";
+    code += "std::string variantToString(const std::variant<int, std::string, bool>& v) {\n";
+    code += "    return std::visit([](const auto& value) -> std::string {\n";
+    code += "        using T = std::decay_t<decltype(value)>;\n";
+    code += "        if constexpr (std::is_same_v<T, int>) {\n";
+    code += "            return std::to_string(value);\n";
+    code += "        } else if constexpr (std::is_same_v<T, std::string>) {\n";
+    code += "            return value;\n";
+    code += "        } else if constexpr (std::is_same_v<T, bool>) {\n";
+    code += "            return value ? \"true\" : \"false\";\n";
+    code += "        } else {\n";
+    code += "            return \"<unknown>\";\n";
+    code += "        }\n";
+    code += "    }, v);\n";
+    code += "}\n\n";
+    
+    // Add helper functions for printing variants
+    code += "std::ostream& operator<<(std::ostream& os, const std::variant<int, std::string, bool>& v) {\n";
+    code += "    os << variantToString(v);\n";
+    code += "    return os;\n";
+    code += "}\n\n";
+    
+    // Add helper functions for printing vectors of variants
+    code += "std::ostream& operator<<(std::ostream& os, const std::vector<std::variant<int, std::string, bool>>& vec) {\n";
+    code += "    os << '[';\n";
+    code += "    for (size_t i = 0; i < vec.size(); ++i) {\n";
+    code += "        os << vec[i];\n";
+    code += "        if (i < vec.size() - 1) {\n";
+    code += "            os << \", \";\n";
+    code += "        }\n";
+    code += "    }\n";
+    code += "    os << ']';\n";
+    code += "    return os;\n";
+    code += "}\n\n";
+    
+    // Add helper functions for printing vectors of strings
+    code += "std::ostream& operator<<(std::ostream& os, const std::vector<std::string>& vec) {\n";
+    code += "    os << '[';\n";
+    code += "    for (size_t i = 0; i < vec.size(); ++i) {\n";
+    code += "        os << '\"' << vec[i] << '\"';\n";
+    code += "        if (i < vec.size() - 1) {\n";
+    code += "            os << \", \";\n";
+    code += "        }\n";
+    code += "    }\n";
+    code += "    os << ']';\n";
+    code += "    return os;\n";
+    code += "}\n\n";    
+    
+    // Add helper functions for string operations
+    code += "std::string stringReplace(const std::string& str, const std::string& oldStr, const std::string& newStr) {\n";
+    code += "    std::string result = str;\n";
+    code += "    size_t pos = 0;\n";
+    code += "    while ((pos = result.find(oldStr, pos)) != std::string::npos) {\n";
+    code += "        result.replace(pos, oldStr.length(), newStr);\n";
+    code += "        pos += newStr.length();\n";
+    code += "    }\n";
+    code += "    return result;\n";
+    code += "}\n\n";
+    
+    code += "std::vector<std::string> stringExcision(const std::string& str, const std::string& delimiter) {\n";
+    code += "    std::vector<std::string> result;\n";
+    code += "    size_t start = 0;\n";
+    code += "    size_t end = str.find(delimiter);\n";
+    code += "    while (end != std::string::npos) {\n";
+    code += "        result.push_back(str.substr(start, end - start));\n";
+    code += "        start = end + delimiter.length();\n";
+    code += "        end = str.find(delimiter, start);\n";
+    code += "    }\n";
+    code += "    result.push_back(str.substr(start));\n";
+    code += "    return result;\n";
+    code += "}\n\n";
+    
+    // Add helper functions for list operations
+code += "void listAdd(std::vector<std::variant<int, std::string, bool>>& list, int value) {\n";
+code += "    list.push_back(value);\n";
+code += "}\n\n";
+
+code += "void listAdd(std::vector<std::variant<int, std::string, bool>>& list, const std::string& value) {\n";
+code += "    list.push_back(value);\n";
+code += "}\n\n";
+
+code += "void listAdd(std::vector<std::variant<int, std::string, bool>>& list, const char* value) {\n";
+code += "    list.push_back(std::string(value));\n";
+code += "}\n\n";
+
+code += "void listAdd(std::vector<std::variant<int, std::string, bool>>& list, bool value) {\n";
+code += "    list.push_back(value);\n";
+code += "}\n\n";
+
+// Overloaded get functions for different types with negative index support
+// String indexing
+code += "char get(const std::string& str, int index) {\n";
+code += "    if (index < 0) {\n";
+code += "        index = str.length() + index;\n";
+code += "    }\n";
+code += "    if (index < 0 || index >= str.length()) {\n";
+code += "        return '\\0';\n";
+code += "    }\n";
+code += "    return str[index];\n";
+code += "}\n\n";
+
+// List indexing
+code += "std::variant<int, std::string, bool> get(const std::vector<std::variant<int, std::string, bool>>& list, int index) {\n";
+code += "    if (index < 0) {\n";
+code += "        index = list.size() + index;\n";
+code += "    }\n";
+code += "    if (index < 0 || index >= list.size()) {\n";
+code += "        return std::string(\"undefined\");\n";
+code += "    }\n";
+code += "    return list[index];\n";
+code += "}\n\n";
+
+// HashMap access
+code += "std::variant<int, std::string, bool> get(const std::unordered_map<std::string, std::variant<int, std::string, bool>>& map, const std::string& key) {\n";
+code += "    auto it = map.find(key);\n";
+code += "    if (it != map.end()) {\n";
+code += "        return it->second;\n";
+code += "    }\n";
+code += "    return std::string(\"undefined\");\n";
+code += "}\n\n";
+
+code += "std::variant<int, std::string, bool> get(const std::unordered_map<std::string, std::variant<int, std::string, bool>>& map, const std::string& key, const std::string& defaultValue) {\n";
+code += "    auto it = map.find(key);\n";
+code += "    if (it != map.end()) {\n";
+code += "        return it->second;\n";
+code += "    }\n";
+code += "    return defaultValue;\n";
+code += "}\n\n";
+    
+    code += "std::vector<std::string> mapKeys(const std::unordered_map<std::string, std::variant<int, std::string, bool>>& map) {\n";
+    code += "    std::vector<std::string> keys;\n";
+    code += "    for (const auto& pair : map) {\n";
+    code += "        keys.push_back(pair.first);\n";
+    code += "    }\n";
+    code += "    return keys;\n";
+    code += "}\n\n";
+    
+    code += "std::vector<std::variant<int, std::string, bool>> mapValues(const std::unordered_map<std::string, std::variant<int, std::string, bool>>& map) {\n";
+    code += "    std::vector<std::variant<int, std::string, bool>> values;\n";
+    code += "    for (const auto& pair : map) {\n";
+    code += "        values.push_back(pair.second);\n";
+    code += "    }\n";
+    code += "    return values;\n";
+    code += "}\n\n";
     
     // Add range generator implementation
     code += "// Range generator implementation\n";
@@ -258,11 +404,11 @@ std::string CodeGenerator::generateFunctionDeclaration(FunctionDeclaration* func
         } else if (auto switchStmt = dynamic_cast<SwitchStatement*>(stmt)) {
             code += generateSwitchStatement(switchStmt);
         } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
-            code += "    return";
-            if (returnStmt->expression) {
-                code += " " + generateExpression(returnStmt->expression);
-            }
-            code += ";\n";
+        code += "    return";
+        if (returnStmt->expression) {
+            code += " " + generateExpression(returnStmt->expression, false);
+        }
+        code += ";\n";
         } else if (auto nestedFunc = dynamic_cast<FunctionDeclaration*>(stmt)) {
             // Generate nested function declaration
             code += "    " + generateFunctionDeclaration(nestedFunc);
@@ -284,25 +430,32 @@ std::string CodeGenerator::generateExpressionStatement(ExpressionStatement* stmt
             (funcCall->objectName == "System" && funcCall->methodName == "input")) {
             // For System.print and System.input, generate the statement without adding semicolon
             // because generateFunctionCall already returns a complete statement with << std::endl
-            return "    " + generateExpression(stmt->expression) + ";\n";
+            return "    " + generateExpression(stmt->expression, false) + ";\n";
         }
     }
     if (auto assignExpr = dynamic_cast<AssignmentExpression*>(stmt->expression)) {
         if (auto ident = dynamic_cast<Identifier*>(assignExpr->left)) {
             // Only generate auto declaration for instance creation expressions
             if (dynamic_cast<InstanceCreationExpression*>(assignExpr->right)) {
-                return "    auto " + generateExpression(assignExpr) + ";\n";
+                return "    auto " + generateExpression(assignExpr, false) + ";\n";
             }
         }
     }
-    return "    " + generateExpression(stmt->expression) + ";\n";
+    return "    " + generateExpression(stmt->expression, false) + ";\n";
 }
 
 // Generate variable declaration
 std::string CodeGenerator::generateVariableDeclaration(VariableDeclaration* varDecl) {
     std::string code = "    ";
     
-    if (varDecl->isDefine) {
+    // Check for immut (constant)
+    if (varDecl->isImmut) {
+        code += "const auto " + varDecl->name;
+        if (varDecl->initializer) {
+            code += " = " + generateExpression(varDecl->initializer, false);
+        }
+        code += ";\n";
+    } else if (varDecl->isDefine) {
         // Define statement: use std::string with empty value
         code += "std::string " + varDecl->name + ";\n";
     } else if (varDecl->isAuto) {
@@ -328,9 +481,9 @@ std::string CodeGenerator::generateVariableDeclaration(VariableDeclaration* varD
         } else if (varDecl->type == "double") {
             cppType = "double";
         } else if (varDecl->type == "List") {
-            cppType = "std::vector<int>";
+            cppType = "std::vector<std::variant<int, std::string, bool>>";
         } else if (varDecl->type == "HashMap") {
-            cppType = "std::unordered_map<std::string, std::string>";
+            cppType = "std::unordered_map<std::string, std::variant<int, std::string, bool>>";
         } else {
             cppType = varDecl->type;
         }
@@ -351,7 +504,7 @@ std::string CodeGenerator::generateNamespaceAccess(NamespaceAccess* access) {
 }
 
 // Generate expression
-std::string CodeGenerator::generateExpression(Expression* expr) {
+std::string CodeGenerator::generateExpression(Expression* expr, bool isLvalue) {
     if (auto ident = dynamic_cast<Identifier*>(expr)) {
         return generateIdentifier(ident);
     } else if (auto nsAccess = dynamic_cast<NamespaceAccess*>(expr)) {
@@ -369,7 +522,7 @@ std::string CodeGenerator::generateExpression(Expression* expr) {
     } else if (auto boolLit = dynamic_cast<BooleanLiteral*>(expr)) {
         return generateBooleanLiteral(boolLit);
     } else if (auto binaryExpr = dynamic_cast<BinaryExpression*>(expr)) {
-        return generateBinaryExpression(binaryExpr);
+        return generateBinaryExpression(binaryExpr, isLvalue);
     } else if (auto assignExpr = dynamic_cast<AssignmentExpression*>(expr)) {
         return generateAssignmentExpression(assignExpr);
     } else if (auto funcCall = dynamic_cast<FunctionCall*>(expr)) {
@@ -469,10 +622,14 @@ std::string CodeGenerator::generateDoubleLiteral(DoubleLiteral* literal) {
 }
 
 // Generate binary expression
-std::string CodeGenerator::generateBinaryExpression(BinaryExpression* expr) {
-    std::string left = generateExpression(expr->left);
-    std::string right = generateExpression(expr->right);
+std::string CodeGenerator::generateBinaryExpression(BinaryExpression* expr, bool isLvalue) {
     std::string op = expr->op;
+    
+    // For regular binary operators, left and right are rvalues
+    // For [] operator, left is lvalue if we're writing to it
+    bool leftIsLvalue = (op == "[" && isLvalue);
+    std::string left = generateExpression(expr->left, leftIsLvalue);
+    std::string right = generateExpression(expr->right, false);
     
     // Handle different operators
     if (op == "+") {
@@ -511,6 +668,16 @@ std::string CodeGenerator::generateBinaryExpression(BinaryExpression* expr) {
         return left + " > " + right;
     } else if (op == ">=") {
         return left + " >= " + right;
+    } else if (op == "[") {
+        // Handle array indexing based on lvalue context
+        if (isLvalue) {
+            // Writing to index - need to handle negative indices manually
+            // For negative indices, we'll generate code that converts to positive
+            return left + "[" + right + "]";
+        } else {
+            // Reading from index - use overloaded get function
+            return "get(" + left + ", " + right + ")";
+        }
     }
     
     return left + " " + op + " " + right;
@@ -518,7 +685,7 @@ std::string CodeGenerator::generateBinaryExpression(BinaryExpression* expr) {
 
 // Generate if statement
 std::string CodeGenerator::generateIfStatement(IfStatement* stmt) {
-    std::string code = "    if (" + generateExpression(stmt->condition) + ") {\n";
+    std::string code = "    if (" + generateExpression(stmt->condition, false) + ") {\n";
     
     // Generate if body
     for (auto bodyStmt : stmt->ifBody) {
@@ -535,7 +702,7 @@ std::string CodeGenerator::generateIfStatement(IfStatement* stmt) {
     
     // Generate else-if clauses
     for (auto elseIf : stmt->elseIfs) {
-        code += " else if (" + generateExpression(elseIf->condition) + ") {\n";
+        code += " else if (" + generateExpression(elseIf->condition, false) + ") {\n";
         
         // Generate else-if body
         for (auto bodyStmt : elseIf->ifBody) {
@@ -582,10 +749,10 @@ std::string CodeGenerator::generateForLoopStatement(ForLoopStatement* stmt) {
         code += generateVariableDeclaration(varDecl).substr(4); // Remove indentation
         code.pop_back(); // Remove newline
     } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(stmt->initialization)) {
-        code += generateExpression(exprStmt->expression);
+        code += generateExpression(exprStmt->expression, false);
     }
     
-    code += "; " + generateExpression(stmt->condition) + "; " + generateExpression(stmt->increment) + ") {\n";
+    code += "; " + generateExpression(stmt->condition, false) + "; " + generateExpression(stmt->increment, false) + ") {\n";
     
     // Generate loop body
     for (auto bodyStmt : stmt->body) {
@@ -608,10 +775,10 @@ std::string CodeGenerator::generateForInLoopStatement(ForInLoopStatement* stmt) 
     
     if (stmt->isKeyValuePair) {
         // Generate C++ range-based for loop with structured binding for hash map
-        code = "    for (auto &[" + stmt->keyVariableName + ", " + stmt->valueVariableName + "] : " + generateExpression(stmt->collection) + ") {\n";
+        code = "    for (auto &[" + stmt->keyVariableName + ", " + stmt->valueVariableName + "] : " + generateExpression(stmt->collection, false) + ") {\n";
     } else {
         // Generate C++ range-based for loop for list
-        code = "    for (auto " + stmt->keyVariableName + " : " + generateExpression(stmt->collection) + ") {\n";
+        code = "    for (auto " + stmt->keyVariableName + " : " + generateExpression(stmt->collection, false) + ") {\n";
     }
     
     // Generate loop body
@@ -647,7 +814,7 @@ std::string CodeGenerator::generateForInLoopStatement(ForInLoopStatement* stmt) 
 
 // Generate while loop statement
 std::string CodeGenerator::generateWhileLoopStatement(WhileLoopStatement* stmt) {
-    std::string code = "    while (" + generateExpression(stmt->condition) + ") {\n";
+    std::string code = "    while (" + generateExpression(stmt->condition, false) + ") {\n";
     
     // Generate loop body
     for (auto bodyStmt : stmt->body) {
@@ -679,13 +846,14 @@ std::string CodeGenerator::generateDoWhileLoopStatement(DoWhileLoopStatement* st
         }
     }
     
-    code += "    } while (" + generateExpression(stmt->condition) + ");\n";
+    code += "    } while (" + generateExpression(stmt->condition, false) + ");\n";
     return code;
 }
 
 // Generate case statement
 std::string CodeGenerator::generateCaseStatement(CaseStatement* stmt) {
-    std::string code = "    case " + generateExpression(stmt->value) + ": {\n";
+    std::string code;
+    code += "    case " + generateExpression(stmt->value, false) + ": {\n";
     
     // Generate case body
     for (auto bodyStmt : stmt->body) {
@@ -704,7 +872,8 @@ std::string CodeGenerator::generateCaseStatement(CaseStatement* stmt) {
 
 // Generate switch statement
 std::string CodeGenerator::generateSwitchStatement(SwitchStatement* stmt) {
-    std::string code = "    switch (" + generateExpression(stmt->expression) + ") {\n";
+    std::string code;
+    code += "    switch (" + generateExpression(stmt->expression, false) + ") {\n";
     
     // Generate case statements
     for (auto caseStmt : stmt->cases) {
@@ -905,7 +1074,7 @@ std::string CodeGenerator::generateClassMethodDeclaration(ClassMethodDeclaration
         } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
             std::string stmtCode = "return";
             if (returnStmt->expression) {
-                std::string exprCode = generateExpression(returnStmt->expression);
+                std::string exprCode = generateExpression(returnStmt->expression, false);
                 // Replace instance. and instance-> with this-> in return expression
                 size_t pos = 0;
                 while ((pos = exprCode.find("instance", pos)) != std::string::npos) {
@@ -1068,7 +1237,7 @@ std::string CodeGenerator::generateInstanceCreationExpression(InstanceCreationEx
     
     // Generate arguments
     for (size_t i = 0; i < expr->arguments.size(); ++i) {
-        code += generateExpression(expr->arguments[i]);
+        code += generateExpression(expr->arguments[i], false);
         if (i < expr->arguments.size() - 1) {
             code += ", ";
         }
@@ -1086,12 +1255,13 @@ std::string CodeGenerator::generateInstanceAccessExpression(InstanceAccessExpres
     if (memberName == "Id") {
         memberName = "id";
     }
-    return generateExpression(expr->instance) + "->" + memberName;
+    return generateExpression(expr->instance, false) + "->" + memberName;
 }
 
 // Generate assignment expression
 std::string CodeGenerator::generateAssignmentExpression(AssignmentExpression* expr) {
-    return generateExpression(expr->left) + " = " + generateExpression(expr->right);
+    // For assignment, left side is an lvalue
+    return generateExpression(expr->left, true) + " = " + generateExpression(expr->right, false);
 }
 
 // Generate function call
@@ -1102,7 +1272,7 @@ std::string CodeGenerator::generateFunctionCall(FunctionCall* call) {
         
         // Generate arguments
         for (size_t i = 0; i < call->arguments.size(); ++i) {
-            std::string argExpr = generateExpression(call->arguments[i]);
+            std::string argExpr = generateExpression(call->arguments[i], false);
             
             // If argument contains + operator, we need to handle it specially
             if (argExpr.find(" + ") != std::string::npos) {
@@ -1130,7 +1300,7 @@ std::string CodeGenerator::generateFunctionCall(FunctionCall* call) {
         
         // Generate prompt if provided
         if (!call->arguments.empty()) {
-            code += "std::cout << " + generateExpression(call->arguments[0]) + "; ";
+            code += "std::cout << " + generateExpression(call->arguments[0], false) + "; ";
         }
         
         // Generate input reading - no cin.ignore() needed for compiled programs
@@ -1143,7 +1313,7 @@ std::string CodeGenerator::generateFunctionCall(FunctionCall* call) {
             return "// Type conversion requires an argument";
         }
         
-        std::string arg = generateExpression(call->arguments[0]);
+        std::string arg = generateExpression(call->arguments[0], false);
         
         if (call->methodName == "int") {
             return "std::stoi(" + arg + ")";
@@ -1162,7 +1332,7 @@ std::string CodeGenerator::generateFunctionCall(FunctionCall* call) {
         
         // Generate arguments
         for (size_t i = 0; i < call->arguments.size(); ++i) {
-            code += generateExpression(call->arguments[i]);
+            code += generateExpression(call->arguments[i], false);
             if (i < call->arguments.size() - 1) {
                 code += ", ";
             }
@@ -1186,6 +1356,116 @@ std::string CodeGenerator::generateFunctionCall(FunctionCall* call) {
         code += ")";
         return code;
     } else {
+        // Handle string operations
+        if (call->methodName == "replace") {
+            // str.replace(old, new) -> stringReplace(str, old, new)
+            std::string code = "stringReplace(" + call->objectName + ", ";
+            // Generate arguments
+            for (size_t i = 0; i < call->arguments.size(); ++i) {
+                code += generateExpression(call->arguments[i]);
+                if (i < call->arguments.size() - 1) {
+                    code += ", ";
+                }
+            }
+            code += ")";
+            return code;
+        } else if (call->methodName == "excision") {
+            // str.excision(delimiter) -> stringExcision(str, delimiter)
+            std::string code = "stringExcision(" + call->objectName + ", ";
+            // Generate arguments
+            for (size_t i = 0; i < call->arguments.size(); ++i) {
+                code += generateExpression(call->arguments[i]);
+                if (i < call->arguments.size() - 1) {
+                    code += ", ";
+                }
+            }
+            code += ")";
+            return code;
+        }
+        // Handle list and map operations
+        else if (call->methodName == "add") {
+            // Only use listAdd for List objects, not for module methods
+            // Check if objectName is a List by looking at its type (this is a simplified check)
+            // In Vanction, List variables are declared with List type, so their names don't indicate their type
+            // A better approach would be to track variable types, but for now we'll use a heuristic
+            // If the objectName is not a module (doesn't contain underscores or dots), assume it's a List
+            bool isListObject = true;
+            
+            // Check if it's likely a module (contains underscores, dots, or known module names)
+            if (call->objectName.find('_') != std::string::npos || 
+                call->objectName.find('.') != std::string::npos ||
+                call->objectName == "math") {
+                isListObject = false;
+            }
+            
+            if (isListObject) {
+                // List.add() -> listAdd(list, value)
+                std::string code = "listAdd(" + call->objectName + ", ";
+                // Generate arguments
+                for (size_t i = 0; i < call->arguments.size(); ++i) {
+                    code += generateExpression(call->arguments[i]);
+                    if (i < call->arguments.size() - 1) {
+                        code += ", ";
+                    }
+                }
+                code += ")";
+                return code;
+            } else {
+                // For module methods, use normal method call syntax
+                std::string code = call->objectName + "->" + call->methodName + "(";
+                // Generate arguments
+                for (size_t i = 0; i < call->arguments.size(); ++i) {
+                    code += generateExpression(call->arguments[i]);
+                    if (i < call->arguments.size() - 1) {
+                        code += ", ";
+                    }
+                }
+                code += ")";
+                return code;
+            }
+        } else if (call->methodName == "get") {
+            // Check if it's a HashMap get operation by looking at the argument type
+            bool isHashMapGet = false;
+            if (call->arguments.size() > 0) {
+                // If the first argument is a string literal, it's probably a HashMap get
+                if (dynamic_cast<StringLiteral*>(call->arguments[0])) {
+                    isHashMapGet = true;
+                }
+            }
+            
+            if (isHashMapGet) {
+                // HashMap.get() -> get(map, key)
+                std::string code = "get(" + call->objectName + ", ";
+                // Generate arguments
+                for (size_t i = 0; i < call->arguments.size(); ++i) {
+                    code += generateExpression(call->arguments[i]);
+                    if (i < call->arguments.size() - 1) {
+                        code += ", ";
+                    }
+                }
+                code += ")";
+                return code;
+            } else {
+                // List.get() -> get(list, index)
+                std::string code = "get(" + call->objectName + ", ";
+                // Generate arguments
+                for (size_t i = 0; i < call->arguments.size(); ++i) {
+                    code += generateExpression(call->arguments[i]);
+                    if (i < call->arguments.size() - 1) {
+                        code += ", ";
+                    }
+                }
+                code += ")";
+                return code;
+            }
+        } else if (call->methodName == "key" || call->methodName == "keys") {
+            // map.key() or map.keys() -> mapKeys(map)
+            return "mapKeys(" + call->objectName + ")";
+        } else if (call->methodName == "value" || call->methodName == "values") {
+            // map.value() or map.values() -> mapValues(map)
+            return "mapValues(" + call->objectName + ")";
+        }
+        
         // Check if it's an instance method call (e.g., obj.method()) or namespace function call
         // In Vanction, instance variables are created with instance keyword, so we need to check if objectName is an instance variable
         // For now, assume any objectName that's not a known namespace is an instance variable
@@ -1213,11 +1493,12 @@ std::string CodeGenerator::generateComment(Comment* comment) {
 
 // Generate list literal expression
 std::string CodeGenerator::generateListLiteral(ListLiteral* list) {
-    std::string code = "std::vector<int>{";
+    // Use a variant type that can handle different data types
+    std::string code = "std::vector<std::variant<int, std::string, bool>>{";
     
     // Generate elements
     for (size_t i = 0; i < list->elements.size(); ++i) {
-        code += generateExpression(list->elements[i]);
+        code += generateExpression(list->elements[i], false);
         if (i < list->elements.size() - 1) {
             code += ", ";
         }
@@ -1229,25 +1510,15 @@ std::string CodeGenerator::generateListLiteral(ListLiteral* list) {
 
 // Generate hash map literal expression
 std::string CodeGenerator::generateHashMapLiteral(HashMapLiteral* hashMap) {
-    // Use std::unordered_map<std::string, std::string> for simplicity
-    // This allows for easy string formatting and avoids type conversion issues
-    std::string code = "std::unordered_map<std::string, std::string>{";
+    // Use variant type that can handle different data types
+    std::string code = "std::unordered_map<std::string, std::variant<int, std::string, bool>>{";
     
     // Generate entries
     for (size_t i = 0; i < hashMap->entries.size(); ++i) {
         auto entry = hashMap->entries[i];
         
-        // For string values, just use them directly
-        // For other types, convert to string using std::to_string
-        std::string key = generateExpression(entry->key);
-        std::string value = generateExpression(entry->value);
-        
-        // If the value is a number literal, convert it to string
-        if (dynamic_cast<IntegerLiteral*>(entry->value)) {
-            value = "std::to_string(" + value + ")";
-        } else if (dynamic_cast<FloatLiteral*>(entry->value)) {
-            value = "std::to_string(" + value + ")";
-        }
+        std::string key = generateExpression(entry->key, false);
+        std::string value = generateExpression(entry->value, false);
         
         code += "{" + key + ", " + value + "}";
         if (i < hashMap->entries.size() - 1) {
@@ -1261,9 +1532,9 @@ std::string CodeGenerator::generateHashMapLiteral(HashMapLiteral* hashMap) {
 
 // Generate range expression
 std::string CodeGenerator::generateRangeExpression(RangeExpression* range) {
-    std::string start = generateExpression(range->start);
-    std::string end = generateExpression(range->end);
-    std::string step = range->step ? generateExpression(range->step) : "1";
+    std::string start = generateExpression(range->start, false);
+    std::string end = generateExpression(range->end, false);
+    std::string step = range->step ? generateExpression(range->step, false) : "1";
     
     // Generate a C++ range-based for loop compatible range
     // We'll use a custom generator function for range

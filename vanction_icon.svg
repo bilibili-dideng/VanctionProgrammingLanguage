@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
-  <!-- 渐变背景 -->
+
   <defs>
     <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
@@ -14,14 +14,11 @@
       <feComposite in="blur" in2="SourceGraphic" operator="over"/>
     </filter>
   </defs>
-  
-  <!-- 背景圆形 -->
+
   <circle cx="50" cy="50" r="45" fill="url(#bgGradient)"/>
-  
-  <!-- 装饰性圆环 -->
+
   <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
   <circle cx="50" cy="50" r="35" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
-  
-  <!-- 主字母 V - 完全居中 -->
+
   <path d="M32,32 L50,68 L68,32" stroke="url(#vGradient)" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
 </svg>

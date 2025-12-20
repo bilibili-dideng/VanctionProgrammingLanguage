@@ -35,6 +35,12 @@ private:
     // Parse comment
     Token parseComment();
     
+    // Parse multi-line comment |* ... *|
+    Token parseMultiLineComment();
+    
+    // Parse doc comment |\ ... /|
+    Token parseDocComment();
+    
     // Parse string literal
     Token parseStringLiteral();
     

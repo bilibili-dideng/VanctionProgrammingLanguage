@@ -15,16 +15,16 @@ func main() {
     
     || Test formatted string
     System.print("\nFormatted string:");
-    int abc = 332;
+    var abc = 332;
     System.print(f"abc = {abc}");
     
     string name = "Vanction";
-    int version = 1;
+    var version = 1;
     System.print(f"Welcome to {name} version {version}");
     
-    float pi = 3.14159;
+    var pi = 3.14159;
     System.print(f"Pi is approximately {pi}");
     
-    bool isReady = true;
+    var isReady = true;
     System.print(f"Is ready? {isReady}");
 }

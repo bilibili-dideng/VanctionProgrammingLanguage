@@ -4,7 +4,7 @@ func main() {
     || Test 1: Division by zero error
     try {
         System.print("Test 1: Division by zero");
-        auto result = 10 / 0;
+        var result = 10 / 0;
         System.print("Result: " + result);
     } happen (DivideByZeroError) as e {
         System.print("Caught DivideByZeroError:");
@@ -16,7 +16,7 @@ func main() {
     || Test 2: Value error
     try {
         System.print("\nTest 2: Value error");
-        auto result = type.int("abc");
+        var result = type.int("abc");
         System.print("Result: " + result);
     } happen (ValueError) as e {
         System.print("Caught ValueError:");
@@ -28,7 +28,7 @@ func main() {
     || Test 3: Method error
     try {
         System.print("\nTest 3: Method error");
-        auto obj = instance Person("Test");
+        var obj = instance Person("Test");
         obj.nonExistentMethod();
     } happen (MethodError) as e {
         System.print("Caught MethodError:");
@@ -36,11 +36,25 @@ func main() {
         System.print("  Error type: " + e.type);
         System.print("  Error info: " + e.info);
     }
-    
-    || Test 4: Generic Error type (should catch all errors)
+
+    || Test 4: Immut Error
     try {
-        System.print("\nTest 4: Generic Error type");
-        auto result = 10 / 0;
+        || Test constant reassignment error
+        System.print("\nTest 4: Immut error");
+        immut var b = 30;
+        b = 40; || This should cause an ImmutError
+        System.print(b);
+    } happen (ImmutError) as E {
+        System.print("Caught Immut Error:");
+        System.print("  Error text: " + e.text);
+        System.print("  Error type: " + e.type);
+        System.print("  Error info: " + e.info);
+    }
+    
+    || Test 5: Generic Error type (should catch all errors)
+    try {
+        System.print("\nTest 5: Generic Error type");
+        var result = 10 / 0;
         System.print("Result: " + result);
     } happen (Error) as e {
         System.print("Caught generic Error:");

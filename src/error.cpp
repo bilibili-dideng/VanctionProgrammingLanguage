@@ -3,7 +3,9 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#ifdef _WIN32
 #include <windows.h>
+#endif
 
 // Error class implementation
 Error::Error(ErrorType type, const std::string& message, const std::string& filePath, int line, int column)
@@ -32,6 +34,7 @@ int Error::getColumn() const {
 std::string Error::getTypeString() const {
     switch (type) {
         case ErrorType::CError: return "CError";
+        case ErrorType::VariableError: return "VariableError";
         case ErrorType::MethodError: return "MethodError";
         case ErrorType::CompilationError: return "CompilationError";
         case ErrorType::DivideByZeroError: return "DivideByZeroError";
@@ -43,6 +46,7 @@ std::string Error::getTypeString() const {
         case ErrorType::HashMapKeyError: return "HashMapKeyError";
         case ErrorType::TypeError: return "TypeError";
         case ErrorType::RangeError: return "RangeError";
+        case ErrorType::ImmutError: return "ImmutError";
         case ErrorType::UnknownError: return "UnknownError";
         default: return "UnknownError";
     }
@@ -50,6 +54,7 @@ std::string Error::getTypeString() const {
 
 // Helper function to get absolute path
 std::string getAbsolutePath(const std::string& path) {
+#ifdef _WIN32
     char absolutePath[MAX_PATH];
     DWORD result = GetFullPathNameA(path.c_str(), MAX_PATH, absolutePath, NULL);
     if (result == 0) {
@@ -57,6 +62,11 @@ std::string getAbsolutePath(const std::string& path) {
         return path;
     }
     return std::string(absolutePath);
+#else
+    // For non-Windows systems, return the path as-is
+    // In a real implementation, we would use platform-specific functions
+    return path;
+#endif
 }
 
 // ErrorReporter class implementation
@@ -155,6 +165,7 @@ std::string ErrorReporter::errorTypeToString(ErrorType type) {
         case ErrorType::HashMapKeyError: return "HashMap Key Error";
         case ErrorType::TypeError: return "Type Error";
         case ErrorType::RangeError: return "Range Error";
+        case ErrorType::ImmutError: return "Immut Error";
         default: return "Unknown Error";
     }
 }

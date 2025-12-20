@@ -7,20 +7,19 @@ namespace als {
     }
     class Student(Person) {
         instance.init(instance, name, age, Id) {
-            Person.init(instance, name, age);
             instance.Id = Id;
         }
     }
 }
 func main() {
     || Test_1
-    Test_1 = instance als:Person("bob", 32);
+    var Test_1 = instance als:Person("bob", 32);
     System.print(Test_1.name);
     System.print(Test_1.age);
 
 
     || Test_2
-    Test_2 = instance als:Student("jack", 32, 3);
+    var Test_2 = instance als:Student("jack", 32, 3);
     System.print(Test_2.name);
     System.print(Test_2.age);
     System.print(Test_2.Id);

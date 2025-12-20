@@ -1,7 +1,7 @@
 func main() {
-    auto x = 5;
-    auto y = 10;
-    auto sum = x + y;
+    var x = 5;
+    var y = 10;
+    var sum = x + y;
     System.print(sum);
     return sum;
 }

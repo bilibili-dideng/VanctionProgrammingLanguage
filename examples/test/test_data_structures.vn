@@ -1,0 +1,66 @@
+|| Test List data structure
+func main() {
+    || Create a list
+    var list = [];
+    
+    || Add elements
+    list.add(1);
+    list.add("hello");
+    list.add(true);
+    
+    || Test get method
+    System.print(list.get(0)); || Should print 1
+    System.print(list.get(1)); || Should print hello
+    System.print(list.get(2)); || Should print true
+    
+    || Test negative index
+    System.print(list.get(-1)); || Should print true
+    
+    || Test index access
+    System.print(list[0]); || Should print 1
+    System.print(list[1]); || Should print hello
+    System.print(list[2]); || Should print true
+    System.print(list[-1]); || Should print true
+    
+    || Create a hashmap
+    var map = {};
+    
+    || Add entries
+    map["name"] = "test";
+    map["age"] = 25;
+    map["active"] = true;
+    
+    || Test get method
+    System.print(map.get("name")); || Should print test
+    System.print(map.get("age")); || Should print 25
+    System.print(map.get("active")); || Should print true
+    
+    || Test get with default value
+    System.print(map.get("nonexistent", "default")); || Should print default
+    
+    || Test index access
+    System.print(map["name"]); || Should print test
+    System.print(map["age"]); || Should print 25
+    
+    || Test keys and values methods
+    var keys = map.key();
+    var values = map.value();
+    
+    System.print(keys); || Should print <list>
+    System.print(values); || Should print <list>
+    
+    || Test string methods
+    var str = "hello world";
+    
+    || Test replace method
+    System.print(str.replace("world", "vanction")); || Should print hello vanction
+    
+    || Test excision method
+    var parts = str.excision(" ");
+    System.print(parts); || Should print <list>
+    
+    || Test string index access
+    System.print(str[0]); || Should print h
+    System.print(str[6]); || Should print w
+    System.print(str[-1]); || Should print d
+}
