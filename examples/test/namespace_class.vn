@@ -1,3 +1,4 @@
+import System
 namespace als {
     class Person() {
         instance.init(instance, name, age) {

@@ -1,3 +1,4 @@
+import System
 func main() {
     || Test normal string with escape sequences
     System.print("Normal string with escape sequences:");

@@ -1,3 +1,4 @@
+import System
 || 测试lambda表达式基本功能
 func main() {
     || 1. 基本lambda表达式赋值给变量

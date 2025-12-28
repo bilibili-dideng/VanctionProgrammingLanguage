@@ -1,3 +1,4 @@
+import System
 || Test List data structure
 func main() {
     || Create a list

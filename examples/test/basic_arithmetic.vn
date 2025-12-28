@@ -1,3 +1,4 @@
+import System
 func main() {
     System.print(1 + 2);
     System.print(3 - 1);

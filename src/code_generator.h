@@ -10,18 +10,24 @@ public:
     // Generate C++ code
     std::string generate(Program* program);
     
+    // Constructor
+    CodeGenerator();
+    
 private:
+    // Temporary variable counter for generating unique names
+    size_t tempVarCounter;
+    
     // Generate function declaration
     std::string generateFunctionDeclaration(FunctionDeclaration* func);
     
     // Generate expression statement
-    std::string generateExpressionStatement(ExpressionStatement* stmt);
+    std::string generateExpressionStatement(ExpressionStatement* stmt, bool isNested = false);
     
     // Generate expression
     std::string generateExpression(Expression* expr, bool isLvalue = false);
     
     // Generate variable declaration
-    std::string generateVariableDeclaration(VariableDeclaration* varDecl);
+    std::string generateVariableDeclaration(VariableDeclaration* varDecl, bool useSharedPtr = false);
     
     // Generate identifier
     std::string generateIdentifier(Identifier* ident);

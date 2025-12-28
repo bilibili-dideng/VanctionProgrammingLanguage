@@ -4,13 +4,14 @@
 #include <stdexcept>
 #include <cstdlib>
 #include <direct.h> // For getcwd on Windows
+#include <string>
+#ifdef _WIN32
+#include <windows.h> // For GetModuleFileNameA
+#endif
 #include "error.h"
 
 // Constructor
 ModuleManager::ModuleManager() {
-    // Add current directory as default search path
-    addSearchPath(".");
-    
     // Set current working directory
     char buffer[FILENAME_MAX];
     if (getcwd(buffer, FILENAME_MAX)) {
@@ -19,8 +20,35 @@ ModuleManager::ModuleManager() {
         currentDirectory = ".";
     }
     
+    // Get executable directory
+    std::string execDir;
+#ifdef _WIN32
+    char exeBuffer[FILENAME_MAX];
+    GetModuleFileNameA(NULL, exeBuffer, FILENAME_MAX);
+    std::string exePath(exeBuffer);
+    execDir = exePath.substr(0, exePath.find_last_of('\\'));
+#else
+    char exeBuffer[FILENAME_MAX];
+    ssize_t len = readlink("/proc/self/exe", exeBuffer, FILENAME_MAX - 1);
+    if (len != -1) {
+        exeBuffer[len] = '\0';
+        std::string exePath(exeBuffer);
+        execDir = exePath.substr(0, exePath.find_last_of('/'));
+    } else {
+        execDir = ".";
+    }
+#endif
+    
     // Initialize current executing file directory to current directory
     currentExecutingFileDirectory = currentDirectory;
+    
+    // Add search paths in order of precedence
+    // 1. Current directory (project directory)
+    addSearchPath(".");
+    // 2. Current directory's stdlib
+    addSearchPath("stdlib");
+    // 3. Executable directory's stdlib (for shared standard library)
+    addSearchPath(execDir + "/stdlib");
 }
 
 // Destructor
@@ -109,52 +137,95 @@ void ModuleManager::clearModules() {
 
 // Find the file path of a module
 std::string ModuleManager::findModuleFilePath(const std::string& moduleName) {
-    // First try in the current executing file directory
-    std::string fullPath = currentExecutingFileDirectory + "/" + moduleName + ".vn";
-    std::ifstream file(fullPath);
-    if (file.good()) {
+    // Handle nested modules (with dots)
+    std::string fullPath;
+    std::ifstream file;
+    
+    // Convert module name to file path
+    std::string modulePath = moduleName;
+    size_t dotPos;
+    while ((dotPos = modulePath.find('.')) != std::string::npos) {
+        modulePath.replace(dotPos, 1, "/");
+    }
+    
+    // First try as direct file (with .vn extension)
+    // Try in the current executing file directory
+    fullPath = currentExecutingFileDirectory + "/" + modulePath + ".vn";
+    file.open(fullPath);
+    if (file.is_open()) {
         file.close();
         return fullPath;
     }
     
     // Try in the current executing file directory with each search path
     for (const auto& path : searchPaths) {
-        // Construct the full file path
-        fullPath = currentExecutingFileDirectory + "/" + path + "/" + moduleName + ".vn";
-        
-        // Check if the file exists
-        file.open(fullPath);
-        if (file.good()) {
-            file.close();
-            return fullPath;
-        }
-    }
-    
-    // Try to find the module in each search path with current directory
-    for (const auto& path : searchPaths) {
-        // Construct the full file path
-        fullPath = path + "/" + moduleName + ".vn";
-        
-        // Check if the file exists
-        file.open(fullPath);
-        if (file.good()) {
-            file.close();
-            return fullPath;
+        // Check if path is absolute (starts with drive letter or slash)
+        bool isAbsolute = false;
+        if (!path.empty()) {
+            isAbsolute = (path[0] == '/' || (path.size() > 1 && path[1] == ':'));
         }
         
-        // Try with current directory if path is relative
-        fullPath = currentDirectory + "/" + path + "/" + moduleName + ".vn";
+        // Construct full path based on whether path is absolute
+        std::string combinedPath;
+        if (isAbsolute) {
+            combinedPath = path;
+        } else {
+            combinedPath = currentExecutingFileDirectory + "/" + path;
+        }
+        
+        fullPath = combinedPath + "/" + modulePath + ".vn";
         file.open(fullPath);
-        if (file.good()) {
+        if (file.is_open()) {
             file.close();
             return fullPath;
         }
     }
     
     // Try with current directory directly
-    fullPath = currentDirectory + "/" + moduleName + ".vn";
+    fullPath = currentDirectory + "/" + modulePath + ".vn";
     file.open(fullPath);
-    if (file.good()) {
+    if (file.is_open()) {
+        file.close();
+        return fullPath;
+    }
+    
+    // Try as directory with _package_.vn
+    // Try in the current executing file directory
+    fullPath = currentExecutingFileDirectory + "/" + modulePath + "/_package_.vn";
+    file.open(fullPath);
+    if (file.is_open()) {
+        file.close();
+        return fullPath;
+    }
+    
+    // Try in the current executing file directory with each search path
+    for (const auto& path : searchPaths) {
+        // Check if path is absolute (starts with drive letter or slash)
+        bool isAbsolute = false;
+        if (!path.empty()) {
+            isAbsolute = (path[0] == '/' || (path.size() > 1 && path[1] == ':'));
+        }
+        
+        // Construct full path based on whether path is absolute
+        std::string combinedPath;
+        if (isAbsolute) {
+            combinedPath = path;
+        } else {
+            combinedPath = currentExecutingFileDirectory + "/" + path;
+        }
+        
+        fullPath = combinedPath + "/" + modulePath + "/_package_.vn";
+        file.open(fullPath);
+        if (file.is_open()) {
+            file.close();
+            return fullPath;
+        }
+    }
+    
+    // Try with current directory directly
+    fullPath = currentDirectory + "/" + modulePath + "/_package_.vn";
+    file.open(fullPath);
+    if (file.is_open()) {
         file.close();
         return fullPath;
     }
@@ -189,7 +260,7 @@ Program* ModuleManager::parseModuleFile(const std::string& filePath) {
     // Parse the program and generate AST
     Program* ast = parser.parseProgramAST();
     if (!ast) {
-        throw std::runtime_error("Failed to parse program AST");
+        throw std::runtime_error("Failed to parse program AST in file: " + filePath);
     }
     
     return ast;

@@ -3,6 +3,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <cstdlib>
+#include <ctime>
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -98,6 +100,36 @@ void ErrorReporter::report(const Error& error) {
     
     // Print error type and message in purple
     std::cout << purple(error.getTypeString()) << ": " << blue(error.getMessage()) << reset() << std::endl;
+    
+    // Get a random funny suggestion
+    std::vector<std::string> suggestions = {
+        "Delete the code and run away (just a joke)",
+        "Maybe you need to delete the database and run away (just a joke)",
+        "Maybe try adding more || comments?",
+        "Have you tried turning it off and on again?",
+        "Check if you spelled 'main' correctly!",
+        "Perhaps the compiler or interpreter is having a bad day?",
+        "Please try to burn incense for the god of programming",
+        "Have you considered using a different language? Just kidding!",
+        "Maybe the issue is between the keyboard and the chair",
+        "Try writing code while wearing a Vanction t-shirt",
+        "Consult the Vanction programming oracle for guidance",
+        "Maybe Vanction convulsing? (just a joke)"
+    };
+    
+    // Initialize random seed if not already done
+    static bool seedInitialized = false;
+    if (!seedInitialized) {
+        std::srand(static_cast<unsigned int>(std::time(nullptr)));
+        seedInitialized = true;
+    }
+    
+    // Select random suggestion
+    int randomIndex = std::rand() % suggestions.size();
+    std::string randomSuggestion = suggestions[randomIndex];
+    
+    // Print funny suggestion as a easter egg
+    std::cout << "\n\n⚡️ Suggestion: " << randomSuggestion << std::endl;
     std::cout << std::endl;
 }
 

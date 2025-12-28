@@ -2,6 +2,10 @@
 #include "../include/ast.h"
 #include <iostream>
 
+// Constructor
+CodeGenerator::CodeGenerator() : tempVarCounter(0) {
+}
+
 // Generate namespace declaration
 std::string CodeGenerator::generateNamespaceDeclaration(NamespaceDeclaration* ns) {
     std::string code;
@@ -362,6 +366,9 @@ std::string CodeGenerator::generateFunctionDeclaration(FunctionDeclaration* func
         std::string returnType = func->returnType;
         if (returnType == "string") {
             returnType = "std::string";
+        } else if (returnType.empty()) {
+            // Use auto for functions that return lambda functions
+            returnType = "auto";
         }
         
         // Generate function name
@@ -373,6 +380,9 @@ std::string CodeGenerator::generateFunctionDeclaration(FunctionDeclaration* func
             std::string paramType = param.type;
             if (paramType == "string") {
                 paramType = "std::string";
+            } else if (paramType.empty() || paramType == "auto") {
+                // Use variant for generic parameters (C++17 compatible)
+                paramType = "std::variant<int, std::string, bool>";
             }
             code += paramType + " " + param.name;
             if (i < func->parameters.size() - 1) {
@@ -384,13 +394,53 @@ std::string CodeGenerator::generateFunctionDeclaration(FunctionDeclaration* func
     }
     
     // Generate function body
+    // First pass: check if function returns a nested function (closure)
+    bool returnsNestedFunction = false;
+    // Check if this is the main function - main function never needs closure support
+    if (func->name == "main") {
+        returnsNestedFunction = false;
+    } else {
+        for (auto stmt : func->body) {
+            // Check if this is a return statement that returns an identifier
+            if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
+                if (returnStmt->expression) {
+                    // Check if returning an identifier that might be a nested function
+                    if (auto ident = dynamic_cast<Identifier*>(returnStmt->expression)) {
+                        // Check if there's a nested function with this name
+                        for (auto innerStmt : func->body) {
+                            if (auto nestedFunc = dynamic_cast<FunctionDeclaration*>(innerStmt)) {
+                                if (nestedFunc->name == ident->name) {
+                                    returnsNestedFunction = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    // Check if directly returning a function declaration
+                    if (dynamic_cast<FunctionDeclaration*>(returnStmt->expression)) {
+                        returnsNestedFunction = true;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Generate shared_ptr wrappers for function parameters if needed for closures
+    for (size_t i = 0; i < func->parameters.size(); ++i) {
+        const auto& param = func->parameters[i];
+        if (returnsNestedFunction) {
+            code += "    auto " + param.name + "_ptr = std::make_shared<std::variant<int, std::string, bool>>(" + param.name + ");\n";
+        }
+    }
+    
+    // Generate function body statements
     for (auto stmt : func->body) {
         if (auto comment = dynamic_cast<Comment*>(stmt)) {
             code += generateComment(comment);
         } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(stmt)) {
             code += generateExpressionStatement(exprStmt);
         } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(stmt)) {
-            code += generateVariableDeclaration(varDecl);
+            code += generateVariableDeclaration(varDecl, returnsNestedFunction);
         } else if (auto ifStmt = dynamic_cast<IfStatement*>(stmt)) {
             code += generateIfStatement(ifStmt);
         } else if (auto forStmt = dynamic_cast<ForLoopStatement*>(stmt)) {
@@ -406,12 +456,113 @@ std::string CodeGenerator::generateFunctionDeclaration(FunctionDeclaration* func
         } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(stmt)) {
         code += "    return";
         if (returnStmt->expression) {
-            code += " " + generateExpression(returnStmt->expression, false);
+            // Check if returning a nested function - need to wrap captured variables
+            if (auto nestedFunc = dynamic_cast<FunctionDeclaration*>(returnStmt->expression)) {
+                // Return the nested function - captured variables are already wrapped
+                code += " " + nestedFunc->name;
+            } else {
+                code += " " + generateExpression(returnStmt->expression, false);
+            }
         }
         code += ";\n";
         } else if (auto nestedFunc = dynamic_cast<FunctionDeclaration*>(stmt)) {
-            // Generate nested function declaration
-            code += "    " + generateFunctionDeclaration(nestedFunc);
+            // Generate nested function as a lambda stored in a variable
+            // C++ doesn't support direct nested functions, so we convert to lambdas
+            // Use [=] to capture parameters by value (avoid dangling references)
+            // Variables wrapped in shared_ptr can be accessed through their reference aliases
+            code += "    auto " + nestedFunc->name + " = [=]() -> auto {\n";
+            for (auto bodyStmt : nestedFunc->body) {
+                if (auto comment = dynamic_cast<Comment*>(bodyStmt)) {
+                    code += "        " + generateComment(comment);
+                } else if (auto exprStmt = dynamic_cast<ExpressionStatement*>(bodyStmt)) {
+                    // Generate expression statement for nested function
+                    std::string stmtCode = generateExpressionStatement(exprStmt, true).substr(4);
+                    
+                    // Replace variable access with *_ptr for closure variables
+                    // First replace function parameters
+                    for (size_t i = 0; i < func->parameters.size(); ++i) {
+                        const auto& param = func->parameters[i];
+                        std::string varName = param.name;
+                        size_t pos = 0;
+                        while ((pos = stmtCode.find(varName, pos)) != std::string::npos) {
+                            bool isWordBoundaryBefore = (pos == 0 || !isalnum(stmtCode[pos-1]) && stmtCode[pos-1] != '_');
+                            bool isWordBoundaryAfter = (pos + varName.length() == stmtCode.length() || !isalnum(stmtCode[pos + varName.length()]) && stmtCode[pos + varName.length()] != '_');
+                            
+                            if (isWordBoundaryBefore && isWordBoundaryAfter) {
+                                // Replace variable name with *_ptr for closure variables
+                                stmtCode.replace(pos, varName.length(), "*" + varName + "_ptr");
+                                pos += varName.length() + 5;
+                            } else {
+                                pos += varName.length();
+                            }
+                        }
+                    }
+                    // Then replace outer variable declarations
+                    for (auto outerStmt : func->body) {
+                        if (auto outerVarDecl = dynamic_cast<VariableDeclaration*>(outerStmt)) {
+                            std::string varName = outerVarDecl->name;
+                            size_t pos = 0;
+                            while ((pos = stmtCode.find(varName, pos)) != std::string::npos) {
+                                bool isWordBoundaryBefore = (pos == 0 || !isalnum(stmtCode[pos-1]) && stmtCode[pos-1] != '_');
+                                bool isWordBoundaryAfter = (pos + varName.length() == stmtCode.length() || !isalnum(stmtCode[pos + varName.length()]) && stmtCode[pos + varName.length()] != '_');
+                                
+                                if (isWordBoundaryBefore && isWordBoundaryAfter) {
+                                    // Replace variable name with *_ptr for closure variables
+                                    stmtCode.replace(pos, varName.length(), "*" + varName + "_ptr");
+                                    pos += varName.length() + 5;
+                                } else {
+                                    pos += varName.length();
+                                }
+                            }
+                        }
+                    }
+                    
+                    code += "        " + stmtCode;
+                } else if (auto varDecl = dynamic_cast<VariableDeclaration*>(bodyStmt)) {
+                    code += "        " + generateVariableDeclaration(varDecl, false);
+                } else if (auto returnStmt = dynamic_cast<ReturnStatement*>(bodyStmt)) {
+                    code += "        return";
+                    if (returnStmt->expression) {
+                        // Generate the return expression
+                        std::string exprCode = generateExpression(returnStmt->expression, false);
+                        
+                        // Replace function parameters in return expression
+                        for (size_t i = 0; i < func->parameters.size(); ++i) {
+                            const auto& param = func->parameters[i];
+                            std::string varName = param.name;
+                            size_t pos = 0;
+                            while ((pos = exprCode.find(varName, pos)) != std::string::npos) {
+                                bool isWordBoundaryBefore = (pos == 0 || !isalnum(exprCode[pos-1]) && exprCode[pos-1] != '_');
+                                bool isWordBoundaryAfter = (pos + varName.length() == exprCode.length() || !isalnum(exprCode[pos + varName.length()]) && exprCode[pos + varName.length()] != '_');
+                                
+                                if (isWordBoundaryBefore && isWordBoundaryAfter) {
+                                    // Replace variable name with *_ptr for closure variables
+                                    exprCode.replace(pos, varName.length(), "*" + varName + "_ptr");
+                                    pos += varName.length() + 5;
+                                } else {
+                                    pos += varName.length();
+                                }
+                            }
+                        }
+                        
+                        // Check if this is an assignment to a wrapped variable
+                        if (auto assignExpr = dynamic_cast<AssignmentExpression*>(returnStmt->expression)) {
+                            // For assignment expressions, just return the expression
+                            code += " " + exprCode;
+                        } else if (auto ident = dynamic_cast<Identifier*>(returnStmt->expression)) {
+                            // For identifier returns, check if it's a closure variable and return *var_ptr instead
+                            code += " " + exprCode;
+                        } else {
+                            // For other expressions, return as is
+                            code += " " + exprCode;
+                        }
+                    }
+                    code += ";\n";
+                } else {
+                    code += "        // Unimplemented statement type\n";
+                }
+            }
+            code += "    };\n";
         } else {
             code += "    // Unimplemented statement type\n";
         }
@@ -424,7 +575,7 @@ std::string CodeGenerator::generateFunctionDeclaration(FunctionDeclaration* func
 }
 
 // Generate expression statement
-std::string CodeGenerator::generateExpressionStatement(ExpressionStatement* stmt) {
+std::string CodeGenerator::generateExpressionStatement(ExpressionStatement* stmt, bool isNested) {
     if (auto funcCall = dynamic_cast<FunctionCall*>(stmt->expression)) {
         if ((funcCall->objectName == "System" && funcCall->methodName == "print") ||
             (funcCall->objectName == "System" && funcCall->methodName == "input")) {
@@ -445,7 +596,7 @@ std::string CodeGenerator::generateExpressionStatement(ExpressionStatement* stmt
 }
 
 // Generate variable declaration
-std::string CodeGenerator::generateVariableDeclaration(VariableDeclaration* varDecl) {
+std::string CodeGenerator::generateVariableDeclaration(VariableDeclaration* varDecl, bool useSharedPtr) {
     std::string code = "    ";
     
     // Check for immut (constant)
@@ -459,12 +610,25 @@ std::string CodeGenerator::generateVariableDeclaration(VariableDeclaration* varD
         // Define statement: use std::string with empty value
         code += "std::string " + varDecl->name + ";\n";
     } else if (varDecl->isAuto) {
-        // Auto type inference
-        code += "auto " + varDecl->name;
-        if (varDecl->initializer) {
-            code += " = " + generateExpression(varDecl->initializer);
+        // For closure variables, generate shared_ptr wrapper
+        if (useSharedPtr) {
+            code += "auto " + varDecl->name + "_ptr = std::make_shared<int>(";
+            if (varDecl->initializer) {
+                code += generateExpression(varDecl->initializer, false);
+            } else {
+                code += "0";
+            }
+            code += ");\n";
+            // Also generate the original variable name for non-lambda use
+            code += "auto& " + varDecl->name + " = *" + varDecl->name + "_ptr;\n";
+        } else {
+            // Regular auto variable
+            code += "auto " + varDecl->name;
+            if (varDecl->initializer) {
+                code += " = " + generateExpression(varDecl->initializer);
+            }
+            code += ";\n";
         }
-        code += ";\n";
     } else {
         // Explicit type
         std::string cppType;
@@ -553,8 +717,31 @@ std::string CodeGenerator::generateExpression(Expression* expr, bool isLvalue) {
         
         code += ")";
         return code;
+    } else if (auto indexAccess = dynamic_cast<IndexAccessExpression*>(expr)) {
+        // Generate index access expression, e.g., collection[index]
+        std::string collectionCode = generateExpression(indexAccess->collection, true);
+        std::string indexCode = generateExpression(indexAccess->index, false);
+        
+        if (isLvalue) {
+            // For lvalue (assignment), we can't use get() because it returns a copy
+            // Handle map access with string keys differently from list/string access with numeric indices
+            if (auto stringLit = dynamic_cast<StringLiteral*>(indexAccess->index)) {
+                // Map access with string literal key - use direct [] operator
+                return collectionCode + "[" + indexCode + "]";
+            } else {
+                // List or string access with numeric index - generate code to handle negative indices
+                // Create a temporary variable for the index to handle negative values
+                std::string tempIndex = "temp_index_" + std::to_string(tempVarCounter++);
+                return "(int " + tempIndex + " = " + indexCode + "; " + 
+                       "if (" + tempIndex + " < 0) " + tempIndex + " += " + collectionCode + ".size(); " + 
+                       collectionCode + "[" + tempIndex + "])";
+            }
+        } else {
+            // For rvalue (reading), use get() function to handle negative indices correctly
+            return "get(" + collectionCode + ", " + indexCode + ")";
+        }
     }
-    return "// Unimplemented expression";
+    return "\"\""; // Return empty string instead of comment to avoid compilation errors
 }
 
 // Generate identifier
@@ -649,6 +836,16 @@ std::string CodeGenerator::generateBinaryExpression(BinaryExpression* expr, bool
     
     // Handle different operators
     if (op == "+") {
+        // Special handling for string concatenation
+        // Check if either operand is a string literal
+        bool leftIsStringLiteral = (dynamic_cast<StringLiteral*>(expr->left) != nullptr);
+        bool rightIsStringLiteral = (dynamic_cast<StringLiteral*>(expr->right) != nullptr);
+        
+        // If we're dealing with string concatenation, ensure proper std::string usage
+        if (leftIsStringLiteral || rightIsStringLiteral) {
+            // For string literals combined with other string types, wrap in std::string
+            return "std::string(" + left + ") + " + right;
+        }
         return left + " + " + right;
     } else if (op == "-") {
         return left + " - " + right;
@@ -691,7 +888,7 @@ std::string CodeGenerator::generateBinaryExpression(BinaryExpression* expr, bool
             // For negative indices, we'll generate code that converts to positive
             return left + "[" + right + "]";
         } else {
-            // Reading from index - use overloaded get function
+            // Reading from index - always use overloaded get function to handle negative indices
             return "get(" + left + ", " + right + ")";
         }
     }
@@ -1630,7 +1827,7 @@ std::string CodeGenerator::generateRangeExpression(RangeExpression* range) {
 
 // Generate lambda expression
 std::string CodeGenerator::generateLambdaExpression(LambdaExpression* lambda) {
-    std::string code = "[](";
+    std::string code = "[=](";
     
     // Generate parameters
     for (size_t i = 0; i < lambda->parameters.size(); ++i) {

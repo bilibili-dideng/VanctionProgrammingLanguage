@@ -1,3 +1,4 @@
+import System
 func main() {
     || 创建哈希表
     var person = {

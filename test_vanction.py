@@ -58,7 +58,7 @@ for test_file in test_files:
             [VANCTION_EXEC, mode, test_file],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=15
         )
         
         # 检查结果

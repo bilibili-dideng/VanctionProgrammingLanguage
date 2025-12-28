@@ -1,3 +1,4 @@
+import System
 func main() {
     System.print("Hello, world!");
     return 0;

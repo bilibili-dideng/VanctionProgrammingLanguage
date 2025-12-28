@@ -60,6 +60,8 @@ enum TokenType {
     // Increment/decrement operators
     INCREMENT,
     DECREMENT,
+    // Power operator
+    POWER,
     // Control flow keywords (will be handled as KEYWORD type with specific values)
 }; 
 

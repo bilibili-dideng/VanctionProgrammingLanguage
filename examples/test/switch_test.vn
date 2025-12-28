@@ -1,3 +1,4 @@
+import System
 func main() {
     || 测试整数switch
     var num = 2;

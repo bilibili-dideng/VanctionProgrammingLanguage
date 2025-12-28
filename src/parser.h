@@ -88,6 +88,9 @@ private:
     // Parse comparison expression
     Expression* parseComparisonExpression();
     
+    // Parse power expression
+    Expression* parsePowerExpression();
+    
     // Parse multiplicative expression
     Expression* parseMultiplicativeExpression();
     

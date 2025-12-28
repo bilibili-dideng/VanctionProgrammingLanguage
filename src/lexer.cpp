@@ -205,7 +205,21 @@ Token Lexer::getNextToken() {
     }
     if (current == '*') {
         advance();
-        if (pos < source.length() && source[pos] == '=') {
+        if (debugMode) {
+            std::cout << "[DEBUG] Lexer: Found '*', next char is '" << (pos < source.length() ? source[pos] : '\0') << "'" << std::endl;
+        }
+        if (pos < source.length() && source[pos] == '*') {
+            advance();
+            Token token;
+            token.type = POWER;
+            token.value = "**";
+            token.line = line;
+            token.column = column - 2;
+            if (debugMode) {
+                std::cout << "[DEBUG] Lexer: Created POWER token: " << token.value << std::endl;
+            }
+            return token;
+        } else if (pos < source.length() && source[pos] == '=') {
             advance();
             Token token;
             token.type = MULTIPLY_ASSIGN;
@@ -219,6 +233,9 @@ Token Lexer::getNextToken() {
         token.value = "*";
         token.line = line;
         token.column = column - 1;
+        if (debugMode) {
+            std::cout << "[DEBUG] Lexer: Created MULTIPLY token: " << token.value << std::endl;
+        }
         return token;
     }
     if (current == '/') {
@@ -585,7 +602,7 @@ Token Lexer::parseIdentifierOrKeyword() {
         // Error handling keywords
         value == "try" || value == "happen" || value == "as" ||
         // Import keywords
-        value == "import" || value == "using" || value == "to" ||
+        value == "import" || value == "cimport" || value == "using" || value == "to" ||
         // OOP keywords
         value == "class" || value == "instance" || value == "init" ||
         // Lambda expression keyword

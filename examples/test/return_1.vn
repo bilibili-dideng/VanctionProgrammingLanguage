@@ -1,3 +1,4 @@
+import System
 func main() {
     return 1;
 }

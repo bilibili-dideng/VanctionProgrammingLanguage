@@ -221,6 +221,21 @@ public:
     }
 };
 
+// Index access expression (for array/list/map access using [])
+class IndexAccessExpression : public Expression {
+public:
+    Expression* collection;  // The array/list/map being accessed
+    Expression* index;       // The index/key expression
+    
+    IndexAccessExpression(Expression* collection, Expression* index, int line = 1, int column = 1)
+        : Expression(line, column), collection(collection), index(index) {}
+    
+    ~IndexAccessExpression() {
+        delete collection;
+        delete index;
+    }
+};
+
 // Expression statement
 class ExpressionStatement : public Statement {
 public:
@@ -607,12 +622,18 @@ public:
 // Import statement node
 class ImportStatement : public ASTNode {
 public:
+    enum ImportType {
+        NORMAL_IMPORT,
+        C_IMPORT
+    };
+    
     std::string moduleName;
     std::vector<std::string> members;
     std::string alias;
+    ImportType type;
     
-    ImportStatement(const std::string& moduleName, int line = 1, int column = 1)
-        : ASTNode(line, column), moduleName(moduleName) {}
+    ImportStatement(const std::string& moduleName, ImportType type = NORMAL_IMPORT, int line = 1, int column = 1)
+        : ASTNode(line, column), moduleName(moduleName), type(type) {}
     
     ~ImportStatement() {}
 };

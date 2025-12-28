@@ -311,17 +311,38 @@ ClassDeclaration* Parser::parseClassDeclarationAST() {
 
 // Parse import statement
 ImportStatement* Parser::parseImportStatementAST() {
-    // Consume 'import' keyword
+    // Check if it's import or cimport
+    std::string importKeyword = currentToken.value;
     consume(KEYWORD);
     
-    // Parse module name
+    // Parse module name (allowing dots for nested modules)
     std::string moduleName = currentToken.value;
     int line = currentToken.line;
     int column = currentToken.column;
     consume(IDENTIFIER);
     
-    // Create import statement node
-    auto importStmt = new ImportStatement(moduleName, line, column);
+    // Check for dots in module name (nested modules)
+    while (currentToken.type == DOT) {
+        consume(DOT);
+        moduleName += "." + currentToken.value;
+        consume(IDENTIFIER);
+    }
+    
+    // Create import statement node with correct type
+    ImportStatement::ImportType importType = (importKeyword == "cimport") ? 
+                                            ImportStatement::C_IMPORT : 
+                                            ImportStatement::NORMAL_IMPORT;
+    auto importStmt = new ImportStatement(moduleName, importType, line, column);
+    
+    // Check if there's 'to' clause for alias
+    if (currentToken.type == KEYWORD && currentToken.value == "to") {
+        consume(KEYWORD);
+        
+        // Parse alias name
+        std::string alias = currentToken.value;
+        consume(IDENTIFIER);
+        importStmt->alias = alias;
+    }
     
     // Check if there's 'using' clause for selective import
     if (currentToken.type == KEYWORD && currentToken.value == "using") {
@@ -339,16 +360,6 @@ ImportStatement* Parser::parseImportStatementAST() {
             consume(IDENTIFIER);
             importStmt->members.push_back(memberName);
         }
-    }
-    
-    // Check if there's 'to' clause for alias
-    if (currentToken.type == KEYWORD && currentToken.value == "to") {
-        consume(KEYWORD);
-        
-        // Parse alias name
-        std::string alias = currentToken.value;
-        consume(IDENTIFIER);
-        importStmt->alias = alias;
     }
     
     return importStmt;
@@ -375,7 +386,7 @@ Program* Parser::parseProgramAST() {
             if (cls) {
                 program->declarations.push_back(cls);
             }
-        } else if (currentToken.type == KEYWORD && currentToken.value == "import") {
+        } else if (currentToken.type == KEYWORD && (currentToken.value == "import" || currentToken.value == "cimport")) {
             auto importStmt = parseImportStatementAST();
             if (importStmt) {
                 program->declarations.push_back(importStmt);
@@ -1267,39 +1278,64 @@ Expression* Parser::parseAssignmentExpression() {
     return left;
 }
 
-// Parse multiplication and division expressions
-Expression* Parser::parseMultiplicativeExpression() {
+// Parse power expressions (right-associative)
+Expression* Parser::parsePowerExpression() {
     // Handle unary minus operator
     if (currentToken.type == MINUS) {
         int line = currentToken.line;
         int column = currentToken.column;
         consume(MINUS);
+        
+        // If the next token is an integer literal, parse it as a negative integer
+        if (currentToken.type == INTEGER_LITERAL) {
+            auto right = parsePostfixExpression();
+            // Return the integer literal as is (it already has the negative sign from the lexer)
+            return right;
+        }
+        
+        // Otherwise, create a binary expression with 0 as left operand and right as right operand
         auto right = parsePostfixExpression();
-        // Create a binary expression with 0 as left operand and right as right operand
         auto zero = new IntegerLiteral(0, line, column);
         return new BinaryExpression(zero, "-", right, line, column);
     }
     
     auto left = parsePostfixExpression();
     
+    // For right-associativity, we need to handle power operators recursively
+    // This ensures a ** b ** c is parsed as a ** (b ** c)
+    if (currentToken.type == POWER) {
+        int line = currentToken.line;
+        int column = currentToken.column;
+        consume(POWER);
+        auto right = parsePowerExpression();
+        left = new BinaryExpression(left, "**", right, line, column);
+    }
+    
+    return left;
+}
+
+// Parse multiplication and division expressions
+Expression* Parser::parseMultiplicativeExpression() {
+    auto left = parsePowerExpression();
+    
     while (true) {
         if (currentToken.type == MULTIPLY) {
         int line = currentToken.line;
         int column = currentToken.column;
         consume(MULTIPLY);
-        auto right = parsePostfixExpression();
+        auto right = parsePowerExpression();
         left = new BinaryExpression(left, "*", right, line, column);
     } else if (currentToken.type == DIVIDE) {
         int line = currentToken.line;
         int column = currentToken.column;
         consume(DIVIDE);
-        auto right = parsePostfixExpression();
+        auto right = parsePowerExpression();
         left = new BinaryExpression(left, "/", right, line, column);
     } else if (currentToken.type == MODULO) {
         int line = currentToken.line;
         int column = currentToken.column;
         consume(MODULO);
-        auto right = parsePostfixExpression();
+        auto right = parsePowerExpression();
         left = new BinaryExpression(left, "%", right, line, column);
         } else {
             break;
@@ -1444,41 +1480,61 @@ Expression* Parser::parseBinaryExpression() {
     return parseComparisonExpression();
 }
 
-// Parse postfix expression (function calls, etc.)
+// Parse postfix expression (function calls, array access, etc.)
 Expression* Parser::parsePostfixExpression() {
     Expression* expr = parsePrimaryExpression();
     
-    // Check for function call (e.g., expr())
-    while (currentToken.type == LPAREN) {
-        int line = currentToken.line;
-        int column = currentToken.column;
-        consume(LPAREN);
-        
-        // Parse arguments
-        std::vector<Expression*> arguments;
-        if (currentToken.type != RPAREN) {
-            // Parse first argument
-            Expression* arg = parseExpression();
-            if (arg) {
-                arguments.push_back(arg);
-            }
+    // Check for function call (e.g., expr()) or array/map access (e.g., expr[index] or expr())
+    while (true) {
+        if (currentToken.type == LPAREN) {
+            int line = currentToken.line;
+            int column = currentToken.column;
+            consume(LPAREN);
             
-            // Parse additional arguments
-            while (currentToken.type == COMMA) {
-                consume(COMMA);
-                arg = parseExpression();
+            // Parse arguments
+            std::vector<Expression*> arguments;
+            if (currentToken.type != RPAREN) {
+                // Parse first argument
+                Expression* arg = parseExpression();
                 if (arg) {
                     arguments.push_back(arg);
                 }
+                
+                // Parse additional arguments
+                while (currentToken.type == COMMA) {
+                    consume(COMMA);
+                    arg = parseExpression();
+                    if (arg) {
+                        arguments.push_back(arg);
+                    }
+                }
             }
+            
+            // Consume right parenthesis
+            consume(RPAREN);
+            
+            // Create function call expression
+            // Check if it's a direct function call (not a method call)
+            expr = new FunctionCallExpression(expr, arguments, line, column);
         }
-        
-        // Consume right parenthesis
-        consume(RPAREN);
-        
-        // Create function call expression
-        // Check if it's a direct function call (not a method call)
-        expr = new FunctionCallExpression(expr, arguments, line, column);
+        else if (currentToken.type == LBRACKET) {
+            int line = currentToken.line;
+            int column = currentToken.column;
+            consume(LBRACKET);
+            
+            // Parse index expression
+            Expression* index = parseExpression();
+            
+            // Consume right bracket
+            consume(RBRACKET);
+            
+            // Create index access expression
+            expr = new IndexAccessExpression(expr, index, line, column);
+        }
+        else {
+            // No more postfix expressions
+            break;
+        }
     }
     
     return expr;
@@ -1712,40 +1768,33 @@ Expression* Parser::parsePrimaryExpression() {
     else if (currentToken.type == IDENTIFIER || currentToken.type == KEYWORD) {
         int line = currentToken.line;
         int column = currentToken.column;
-        std::string name = currentToken.value;
+        std::string fullName = currentToken.value;
         TokenType tokenType = currentToken.type;
         consume(tokenType);
         
-        Expression* expr = new Identifier(name, line, column);
-        
-        // Check for index access (e.g., list[0])
-        if (currentToken.type == LBRACKET) {
-            // This is an index access expression
-            consume(LBRACKET);
-            Expression* indexExpr = parseExpression();
-            consume(RBRACKET);
-            
-            // Create a binary expression for index access: list[0] becomes list [ 0 ]
-            expr = new BinaryExpression(expr, "[", indexExpr, line, column);
+        // Parse the full namespace path (e.g., std:io)
+        while (currentToken.type == COLON) {
+            consume(COLON);
+            fullName += ":" + currentToken.value;
+            consume(currentToken.type);
         }
         
-        // Check if it's a member access (e.g., obj.member or obj.method())
+        Expression* expr = new Identifier(fullName, line, column);
+        
+        // Check if it's a member access with dot (e.g., std:io.print)
         if (currentToken.type == DOT) {
-            // Consume dot
             consume(DOT);
             
-            // Parse member name - allow both IDENTIFIER and KEYWORD as member names
-            std::string memberName = currentToken.value;
-            TokenType memberType = currentToken.type;
-            consume(memberType);
+            // Parse method name
+            std::string methodName = currentToken.value;
+            consume(currentToken.type);
             
-            // Check if it's a method call (e.g., obj.method())
+            // Check if it's a method call (e.g., std:io.print())
             if (currentToken.type == LPAREN) {
-                // Consume left parenthesis
                 consume(LPAREN);
                 
                 // Create function call node
-                auto call = new FunctionCall(name, memberName);
+                auto call = new FunctionCall(fullName, methodName);
                 
                 // Parse arguments
                 if (currentToken.type != RPAREN) {
@@ -1754,12 +1803,8 @@ Expression* Parser::parsePrimaryExpression() {
                         call->arguments.push_back(arg);
                     }
                     
-                    // Parse additional arguments separated by commas
                     while (currentToken.type == COMMA) {
-                        // Consume comma
                         consume(COMMA);
-                        
-                        // Parse next argument
                         arg = parseExpression();
                         if (arg) {
                             call->arguments.push_back(arg);
@@ -1767,19 +1812,18 @@ Expression* Parser::parsePrimaryExpression() {
                     }
                 }
                 
-                // Expect right parenthesis
                 consume(RPAREN);
-                
                 return call;
             } else {
-                // It's a simple member access
-                return new InstanceAccessExpression(expr, memberName);
+                // Simple member access
+                return new InstanceAccessExpression(expr, methodName);
             }
         }
-        // Check if it's a regular function call (e.g., myFunction())
+        
+        // Check if it's a direct function call (e.g., std:io.print())
         else if (currentToken.type == LPAREN) {
             // Special case for range() function
-            if (name == "range") {
+            if (fullName == "range") {
                 consume(LPAREN);
                 
                 // Parse arguments for range()
@@ -1821,7 +1865,7 @@ Expression* Parser::parsePrimaryExpression() {
                 consume(LPAREN);
                 
                 // Create function call node (use empty object name for regular function calls)
-                auto call = new FunctionCall("", name);
+                auto call = new FunctionCall("", fullName);
                 
                 // Parse arguments
                 if (currentToken.type != RPAREN) {
@@ -2364,12 +2408,38 @@ Expression* Parser::parseBooleanLiteral() {
 
 // Parse function call
 Expression* Parser::parseFunctionCall() {
-    // Parse object name (e.g., System)
+    // Parse object name (e.g., System, std:io)
     std::string objectName = currentToken.value;
     consume(IDENTIFIER);
     
-    // Expect dot
-    consume(DOT);
+    // Check for dot or colon (namespace access operator)
+    if (currentToken.type == DOT || currentToken.type == COLON) {
+        // Consume either dot or colon
+        if (currentToken.type == COLON) {
+            // If colon, check for another colon (for namespace access)
+            consume(COLON);
+        } else {
+            // If dot, just consume it
+            consume(DOT);
+        }
+        
+        // Parse next part of object name (for nested namespaces like std:io)
+        while (currentToken.type == IDENTIFIER && (currentToken.value == "io" || currentToken.value == "type")) {
+            objectName += ":" + currentToken.value;
+            consume(IDENTIFIER);
+            
+            // Check for another dot or colon
+            if (currentToken.type == DOT || currentToken.type == COLON) {
+                if (currentToken.type == COLON) {
+                    consume(COLON);
+                } else {
+                    consume(DOT);
+                }
+            } else {
+                break;
+            }
+        }
+    }
     
     // Parse method name (e.g., print or input)
     std::string methodName = currentToken.value;
